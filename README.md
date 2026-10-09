@@ -197,3 +197,7 @@ herdr plugin link "$PWD"
 `herdr plugin link` does not build the web app: after changes in `web/`, run `bun run build`.
 More context and design decisions in `docs/RESEARCH.md` (Spanish); project conventions in
 `CLAUDE.md`.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
