@@ -82,9 +82,9 @@ import { ensureInstalled } from "./tailscale.ts";
 test.skipIf(process.platform === "darwin")("ensureInstalled errors when installer fails or tailscale stays missing", async () => {
   spyOn(tui, "confirm").mockReturnValue(true);
   const failing: Runner = async (argv) => ({ code: argv[0] === "bash" ? 1 : 127, stdout: "", stderr: "" });
-  await expect(ensureInstalled(failing)).rejects.toThrow("Falló la instalación");
+  await expect(ensureInstalled(failing)).rejects.toThrow("installation failed");
   const missing: Runner = async (argv) => ({ code: argv[0] === "bash" ? 0 : 127, stdout: "", stderr: "" });
-  await expect(ensureInstalled(missing)).rejects.toThrow("no responde");
+  await expect(ensureInstalled(missing)).rejects.toThrow("does not respond");
 });
 
 const SERVE = (proxy: string) =>

@@ -140,7 +140,7 @@ describe("runWizard", () => {
     await runWizard(h.deps);
     expect(readEnv(envPath)).toEqual({ ACCESS_MODE: "local", HOST: "127.0.0.1", PORT: "7340", PUBLIC_URL: "http://localhost:7340" });
     expect(h.calls).toEqual([
-      "choose:¿Desde dónde vas a usar el cliente web?:local", "password", "stopLoose", "install:server",
+      "choose:Where will you use the web client from?:local", "password", "stopLoose", "install:server",
       "statusline", "verify:http://localhost:7340", "enter",
     ]);
     expect(h.output()).toContain("http://localhost:7340");
@@ -150,14 +150,14 @@ describe("runWizard", () => {
     const h = harness({ chooses: ["local"], installResult: "unchanged" });
     await runWizard(h.deps);
     expect(h.calls).toContain("restart:server");
-    expect(h.output()).toContain("sin cambios");
+    expect(h.output()).toContain("unchanged");
   });
 
   test("preselects the saved mode", async () => {
     writeFileSync(envPath, "ACCESS_MODE=lan\nHOST=192.168.1.20\nPUBLIC_URL=http://192.168.1.20:7340\n");
     const h = harness({ chooses: [""] });
     await runWizard(h.deps);
-    expect(h.calls[0]).toBe("choose:¿Desde dónde vas a usar el cliente web?:lan");
+    expect(h.calls[0]).toBe("choose:Where will you use the web client from?:lan");
   });
 
   test("lan: listens on the LAN address and shows its limitations", async () => {
@@ -165,7 +165,7 @@ describe("runWizard", () => {
     await runWizard(h.deps);
     expect(readEnv(envPath)).toMatchObject({ ACCESS_MODE: "lan", HOST: "192.168.1.20", PUBLIC_URL: "http://192.168.1.20:7340" });
     expect(h.calls).toContain("verify:http://192.168.1.20:7340");
-    expect(h.output()).toContain("sin push");
+    expect(h.output()).toContain("no push notifications");
   });
 
   test("lan without a LAN address aborts before writing anything", async () => {
@@ -176,9 +176,9 @@ describe("runWizard", () => {
 
   test("a failed preflight aborts before any question", async () => {
     const h = harness({ chooses: [] });
-    h.deps.preflight = async () => ({ ok: false, problems: ["Falta dist/"] });
+    h.deps.preflight = async () => ({ ok: false, problems: ["dist/ is missing"] });
     await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
-    expect(h.output()).toContain("Falta dist/");
+    expect(h.output()).toContain("dist/ is missing");
     expect(h.calls).toEqual([]);
   });
 
@@ -211,13 +211,13 @@ describe("runWizard", () => {
     expect(h.calls.some((c) => c.startsWith("setupTunnel"))).toBe(false);
     expect(h.calls).not.toContain("stop:tunnel");
     expect(h.calls).not.toContain("uninstall:tunnel");
-    expect(h.confirms.some((c) => c.includes("La URL cambia"))).toBe(false);
+    expect(h.confirms.some((c) => c.includes("The URL changes"))).toBe(false);
     expect(readEnv(envPath)).toMatchObject({ PUBLIC_URL: "https://saved.portal", TUNNEL: "portal" });
   });
 
   test("portal re-run choosing to change stops the running tunnel before probing again", async () => {
     writeFileSync(envPath, "ACCESS_MODE=remote\nPUBLIC_URL=https://herdr-mac.portal.example\nTUNNEL=portal\n");
-    const h = harness({ chooses: ["remote", "portal"], units: ["server", "tunnel"], tunnel: portal, answers: { "¿Cambiar el túnel?": true } });
+    const h = harness({ chooses: ["remote", "portal"], units: ["server", "tunnel"], tunnel: portal, answers: { "Change the tunnel?": true } });
     await runWizard(h.deps);
     expect(h.calls.indexOf("stop:tunnel")).toBeLessThan(h.calls.indexOf("setupTunnel:portal"));
     expect(h.calls).toContain("install:tunnel");
@@ -226,10 +226,10 @@ describe("runWizard", () => {
   test("declining a URL change aborts without touching .env or services", async () => {
     const before = "ACCESS_MODE=local\nPUBLIC_URL=http://localhost:7340\n";
     writeFileSync(envPath, before);
-    const h = harness({ chooses: ["lan"], answers: { "La URL cambia": false } });
+    const h = harness({ chooses: ["lan"], answers: { "The URL changes": false } });
     await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
     expect(h.confirms).toContain(URL_CHANGE);
-    expect(URL_CHANGE).toBe("La URL cambia: los dispositivos y sesiones abiertos con la URL anterior tendrán que volver a entrar. ¿Continuar?");
+    expect(URL_CHANGE).toBe("The URL changes: devices and sessions opened with the old URL will have to sign in again. Continue?");
     expect(readEnv(envPath)).toEqual({ ACCESS_MODE: "local", PUBLIC_URL: "http://localhost:7340" });
     expect(h.calls.some((c) => c.startsWith("install"))).toBe(false);
   });
@@ -238,7 +238,7 @@ describe("runWizard", () => {
     writeFileSync(envPath, "ACCESS_MODE=remote\nPUBLIC_URL=https://saved.portal\nTUNNEL=portal\n");
     const h = harness({
       chooses: ["remote", "portal"], units: ["server", "tunnel"], tunnel: portal,
-      answers: { "¿Cambiar el túnel?": true, "La URL cambia": false },
+      answers: { "Change the tunnel?": true, "The URL changes": false },
     });
     await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
     expect(h.calls).toContain("restart:tunnel");
@@ -246,14 +246,14 @@ describe("runWizard", () => {
 
   test("declining after turning Funnel on turns it off again", async () => {
     writeFileSync(envPath, "ACCESS_MODE=local\nPUBLIC_URL=http://localhost:7340\n");
-    const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "La URL cambia": false } });
+    const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "The URL changes": false } });
     await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
     expect(h.calls).toContain("teardown:tailscale:7340");
   });
 
   test("accepting a URL change proceeds", async () => {
     writeFileSync(envPath, "PUBLIC_URL=http://192.168.1.20:7340\n");
-    const h = harness({ chooses: ["local"], answers: { "La URL cambia": true } });
+    const h = harness({ chooses: ["local"], answers: { "The URL changes": true } });
     await runWizard(h.deps);
     expect(h.confirms).toContain(URL_CHANGE);
     expect(readEnv(envPath).PUBLIC_URL).toBe("http://localhost:7340");
@@ -263,15 +263,15 @@ describe("runWizard", () => {
     writeFileSync(envPath, "PUBLIC_URL=pwd\n");
     const h = harness({ chooses: ["local"] });
     await runWizard(h.deps);
-    expect(h.confirms.some((c) => c.includes("La URL cambia"))).toBe(false);
-    expect(h.output()).toContain("URL guardada no válida (pwd): se reemplaza");
+    expect(h.confirms.some((c) => c.includes("The URL changes"))).toBe(false);
+    expect(h.output()).toContain("Saved URL is not valid (pwd): replacing it");
     expect(readEnv(envPath).PUBLIC_URL).toBe("http://localhost:7340");
     expect(h.calls).toContain("install:server");
   });
 
   test("leaving remote/tailscale turns Funnel off and clears TUNNEL", async () => {
     writeFileSync(envPath, "ACCESS_MODE=remote\nPORT=7340\nPUBLIC_URL=https://mac.tail.ts.net\nTUNNEL=tailscale\n");
-    const h = harness({ chooses: ["local"], units: ["server"], answers: { "La URL cambia": true } });
+    const h = harness({ chooses: ["local"], units: ["server"], answers: { "The URL changes": true } });
     await runWizard(h.deps);
     expect(h.calls).toContain("teardown:tailscale:7340");
     expect(readEnv(envPath).TUNNEL).toBeUndefined();
@@ -279,7 +279,7 @@ describe("runWizard", () => {
 
   test("leaving remote/portal removes the tunnel unit", async () => {
     writeFileSync(envPath, "ACCESS_MODE=remote\nPUBLIC_URL=https://saved.portal\nTUNNEL=portal\n");
-    const h = harness({ chooses: ["local"], units: ["server", "tunnel"], answers: { "La URL cambia": true } });
+    const h = harness({ chooses: ["local"], units: ["server", "tunnel"], answers: { "The URL changes": true } });
     await runWizard(h.deps);
     expect(h.calls).toContain("uninstall:tunnel");
     expect(h.calls).not.toContain("teardown:tailscale:7340");
@@ -287,32 +287,32 @@ describe("runWizard", () => {
 
   test("switching tailscale to portal turns Funnel off", async () => {
     writeFileSync(envPath, "ACCESS_MODE=remote\nPUBLIC_URL=https://mac.tail.ts.net\nTUNNEL=tailscale\n");
-    const h = harness({ chooses: ["remote", "portal"], tunnel: portal, answers: { "La URL cambia": true } });
+    const h = harness({ chooses: ["remote", "portal"], tunnel: portal, answers: { "The URL changes": true } });
     await runWizard(h.deps);
     expect(h.calls).toContain("teardown:tailscale:7340");
     expect(h.calls).toContain("install:tunnel");
   });
 
   test("failed verification offers a retry and shows the log path", async () => {
-    const h = harness({ chooses: ["local"], health: [{ ok: false, reason: "conexión rechazada" }, { ok: true }] });
+    const h = harness({ chooses: ["local"], health: [{ ok: false, reason: "connection refused" }, { ok: true }] });
     await runWizard(h.deps);
     expect(h.calls.filter((c) => c.startsWith("verify")).length).toBe(2);
-    expect(h.output()).toContain("conexión rechazada");
+    expect(h.output()).toContain("connection refused");
     expect(h.output()).toContain("/s/server.log");
-    expect(h.confirms).toContain("¿Reintentar?");
+    expect(h.confirms).toContain("Retry?");
   });
 
   test("declining the retry aborts with no summary", async () => {
-    const h = harness({ chooses: ["local"], health: [{ ok: false, reason: "x" }], answers: { "¿Reintentar?": false } });
+    const h = harness({ chooses: ["local"], health: [{ ok: false, reason: "x" }], answers: { "Retry?": false } });
     await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
     expect(h.calls).not.toContain("enter");
   });
 
   test("a note from the health check is shown, and the summary still follows", async () => {
-    const h = harness({ chooses: ["local"], health: [{ ok: true, note: "Este equipo aún no resuelve x.ts.net" }] });
+    const h = harness({ chooses: ["local"], health: [{ ok: true, note: "This machine cannot resolve x.ts.net yet" }] });
     await runWizard(h.deps);
-    expect(h.output()).toContain("Este equipo aún no resuelve x.ts.net");
-    expect(h.output()).toContain("Listo.");
+    expect(h.output()).toContain("This machine cannot resolve x.ts.net yet");
+    expect(h.output()).toContain("Done.");
   });
 
   describe("Claude Code status line", () => {
@@ -325,7 +325,7 @@ describe("runWizard", () => {
     test("without Claude Code the wizard goes on and explains what is missing", async () => {
       const h = harness({ chooses: ["local"], statusLine: () => ({ status: "no-claude" }) });
       await runWizard(h.deps);
-      expect(h.output()).toContain("Claude Code no está instalado");
+      expect(h.output()).toContain("Claude Code is not installed");
       expect(h.calls).toContain("enter");
     });
 
@@ -357,7 +357,7 @@ describe("runWizard", () => {
       writeFileSync(envPath, LOCAL);
       let during: string | undefined;
       const h = harness({
-        chooses: ["remote", "tailscale"], answers: { "La URL cambia": true },
+        chooses: ["remote", "tailscale"], answers: { "The URL changes": true },
         tunnel: (k) => ((during = readEnv(envPath).TUNNEL), tailscale(k)),
       });
       await runWizard(h.deps);
@@ -366,15 +366,15 @@ describe("runWizard", () => {
 
     test("setupTunnel throwing after Funnel went on: Funnel off, TUNNEL restored", async () => {
       writeFileSync(envPath, LOCAL);
-      const h = harness({ chooses: ["remote", "tailscale"], tunnel: () => { throw new Error("Tailscale no reporta un nombre DNS"); } });
-      await expect(runWizard(h.deps)).rejects.toThrow("nombre DNS");
+      const h = harness({ chooses: ["remote", "tailscale"], tunnel: () => { throw new Error("Tailscale does not report a DNS name"); } });
+      await expect(runWizard(h.deps)).rejects.toThrow("DNS name");
       expect(h.calls).toContain("teardown:tailscale:7340");
       expect(readEnv(envPath)).toEqual({ ACCESS_MODE: "local", HOST: "127.0.0.1", PORT: "7340", PUBLIC_URL: "http://localhost:7340" });
     });
 
     test("an error after setupTunnel (before saving) turns the fresh Funnel off", async () => {
       writeFileSync(envPath, LOCAL);
-      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "La URL cambia": () => { throw new Error("boom"); } } });
+      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "The URL changes": () => { throw new Error("boom"); } } });
       await expect(runWizard(h.deps)).rejects.toThrow("boom");
       expect(h.calls).toContain("teardown:tailscale:7340");
       expect(readEnv(envPath).TUNNEL).toBeUndefined();
@@ -386,7 +386,7 @@ describe("runWizard", () => {
       h = harness({
         chooses: ["remote", "tailscale"], tunnel: tailscale,
         answers: {
-          "La URL cambia": async () => {
+          "The URL changes": async () => {
             const cleanup = h.interrupt();
             expect(cleanup).toBeDefined();
             await cleanup!(); // what SIGINT/SIGHUP runs before exiting 130
@@ -401,7 +401,7 @@ describe("runWizard", () => {
 
     test("an interrupt while setupTunnel is still running turns the fresh Funnel off", async () => {
       writeFileSync(envPath, LOCAL);
-      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "La URL cambia": false } });
+      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "The URL changes": false } });
       let registered = false;
       h.deps.setupTunnel = async (kind, port) => {
         h.calls.push(`setupTunnel:${kind}`);
@@ -427,21 +427,21 @@ describe("runWizard", () => {
 
     test("a stale TUNNEL marker under a local .env does not protect a Funnel this run enabled", async () => {
       writeFileSync(envPath, LOCAL + "TUNNEL=tailscale\n");
-      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "La URL cambia": false } });
+      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "The URL changes": false } });
       await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
       expect(h.calls).toContain("teardown:tailscale:7340");
     });
 
     test("TUNNEL=tailscale in a remote .env but Funnel not serving counts as fresh", async () => {
       writeFileSync(envPath, "ACCESS_MODE=remote\nPORT=7340\nPUBLIC_URL=https://old.ts.net\nTUNNEL=tailscale\n");
-      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "La URL cambia": false } });
+      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, answers: { "The URL changes": false } });
       await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
       expect(h.calls).toContain("teardown:tailscale:7340");
     });
 
     test("a Funnel that cannot be turned off keeps TUNNEL in .env for uninstall", async () => {
       writeFileSync(envPath, LOCAL);
-      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, teardownOk: false, serving: [7340], answers: { "La URL cambia": false } });
+      const h = harness({ chooses: ["remote", "tailscale"], tunnel: tailscale, teardownOk: false, serving: [7340], answers: { "The URL changes": false } });
       await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
       expect(readEnv(envPath).TUNNEL).toBe("tailscale");
       expect(h.output()).toContain("tailscale funnel --bg 7340 off");
@@ -473,7 +473,7 @@ describe("runWizard", () => {
 
     test("a throw in installUnit(server) after stopping Portal starts it again", async () => {
       writeFileSync(envPath, SAVED);
-      const h = harness({ chooses: ["remote", "portal"], units: ["server", "tunnel"], tunnel: portal, answers: { "¿Cambiar el túnel?": true } });
+      const h = harness({ chooses: ["remote", "portal"], units: ["server", "tunnel"], tunnel: portal, answers: { "Change the tunnel?": true } });
       h.deps.installUnit = async (u) => {
         h.calls.push(`install:${u}`);
         throw new Error("launchctl bootstrap failed");
@@ -500,7 +500,7 @@ describe("runWizard", () => {
 
     test("portal without a name fails before anything is saved", async () => {
       const h = harness({ chooses: ["remote", "portal"], tunnel: () => ({ kind: "portal", url: "https://p", persistent: false }) });
-      await expect(runWizard(h.deps)).rejects.toThrow("nombre");
+      await expect(runWizard(h.deps)).rejects.toThrow("tunnel name");
       expect(readEnv(envPath).PUBLIC_URL).toBeUndefined();
       expect(h.calls.some((c) => c.startsWith("install"))).toBe(false);
     });
@@ -510,7 +510,7 @@ describe("runWizard", () => {
     test("shows the detected address as the default", async () => {
       const h = harness({ chooses: ["lan"], asks: [""] });
       await runWizard(h.deps);
-      expect(h.calls).toContain("ask:IP de este equipo en la red [192.168.1.20]:");
+      expect(h.calls).toContain("ask:This machine's network IP [192.168.1.20]:");
       expect(readEnv(envPath).HOST).toBe("192.168.1.20");
     });
 
@@ -518,22 +518,22 @@ describe("runWizard", () => {
       writeFileSync(envPath, "ACCESS_MODE=lan\nHOST=10.8.0.2\nPORT=7340\nPUBLIC_URL=http://10.8.0.2:7340\n");
       const h = harness({ chooses: ["lan"], asks: [""] });
       await runWizard(h.deps);
-      expect(h.calls).toContain("ask:IP de este equipo en la red [10.8.0.2]:");
+      expect(h.calls).toContain("ask:This machine's network IP [10.8.0.2]:");
       expect(readEnv(envPath).HOST).toBe("10.8.0.2");
     });
 
     test("offers the detected address when the saved HOST is gone", async () => {
       writeFileSync(envPath, "ACCESS_MODE=lan\nHOST=192.168.5.5\nPORT=7340\nPUBLIC_URL=http://192.168.5.5:7340\n");
-      const h = harness({ chooses: ["lan"], asks: [""], answers: { "La URL cambia": true } });
+      const h = harness({ chooses: ["lan"], asks: [""], answers: { "The URL changes": true } });
       await runWizard(h.deps);
-      expect(h.calls).toContain("ask:IP de este equipo en la red [192.168.1.20]:");
+      expect(h.calls).toContain("ask:This machine's network IP [192.168.1.20]:");
       expect(readEnv(envPath)).toMatchObject({ HOST: "192.168.1.20", PUBLIC_URL: "http://192.168.1.20:7340" });
     });
 
     test("the lan summary says to re-run setup if the address changes", async () => {
       const h = harness({ chooses: ["lan"], asks: [""] });
       await runWizard(h.deps);
-      expect(h.output()).toContain("Si cambia la IP de este equipo, vuelve a ejecutar la configuración.");
+      expect(h.output()).toContain("If this machine's IP changes, run setup again.");
     });
 
     test("accepts another address of this machine", async () => {
@@ -545,25 +545,25 @@ describe("runWizard", () => {
     test("rejects an address that is not this machine's and asks again", async () => {
       const h = harness({ chooses: ["lan"], asks: ["192.168.1.99", ""] });
       await runWizard(h.deps);
-      expect(h.output()).toContain("192.168.1.99 no es una dirección IPv4 de este equipo");
+      expect(h.output()).toContain("192.168.1.99 is not an IPv4 address of this machine");
       expect(readEnv(envPath).HOST).toBe("192.168.1.20");
     });
 
     test("a public address needs confirmation; No goes back to the prompt", async () => {
-      const h = harness({ chooses: ["lan"], asks: ["203.0.113.7", ""], answers: { "IP es pública": false } });
+      const h = harness({ chooses: ["lan"], asks: ["203.0.113.7", ""], answers: { "IP is public": false } });
       await runWizard(h.deps);
       expect(h.confirms).toContain(PUBLIC_IP);
       expect(readEnv(envPath).HOST).toBe("192.168.1.20");
     });
 
     test("a confirmed public address is used", async () => {
-      const h = harness({ chooses: ["lan"], asks: ["203.0.113.7"], answers: { "IP es pública": true } });
+      const h = harness({ chooses: ["lan"], asks: ["203.0.113.7"], answers: { "IP is public": true } });
       await runWizard(h.deps);
       expect(readEnv(envPath).HOST).toBe("203.0.113.7");
     });
 
     test("a detected public address also needs confirmation", async () => {
-      const h = harness({ chooses: ["lan"], lan: "203.0.113.7", asks: [""], answers: { "IP es pública": true } });
+      const h = harness({ chooses: ["lan"], lan: "203.0.113.7", asks: [""], answers: { "IP is public": true } });
       await runWizard(h.deps);
       expect(h.confirms).toContain(PUBLIC_IP);
     });

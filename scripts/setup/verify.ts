@@ -18,11 +18,11 @@ const TLS_CODES = /CERT|SSL|TLS|SELF_SIGNED|ISSUER|HOSTNAME|ALTNAME/i;
 
 function describe(error: unknown, timeoutMs: number): string {
   const e = error as { name?: string; code?: string; message?: string };
-  if (e?.name === "TimeoutError" || e?.name === "AbortError") return `sin respuesta en ${Math.round(timeoutMs / 1000)} s`;
+  if (e?.name === "TimeoutError" || e?.name === "AbortError") return `no response in ${Math.round(timeoutMs / 1000)} s`;
   const code = e?.code ?? "";
-  if (TLS_CODES.test(code)) return `certificado TLS no válido (${code})`;
-  if (code === "ConnectionRefused" || code === "ECONNREFUSED") return "conexión rechazada: el servidor no está escuchando";
-  if (code === "ENOTFOUND" || code === "FailedToResolve" || /DNS|resolve/i.test(code)) return `no se pudo resolver el nombre (${code})`;
+  if (TLS_CODES.test(code)) return `invalid TLS certificate (${code})`;
+  if (code === "ConnectionRefused" || code === "ECONNREFUSED") return "connection refused: the server is not listening";
+  if (code === "ENOTFOUND" || code === "FailedToResolve" || /DNS|resolve/i.test(code)) return `could not resolve the name (${code})`;
   return code ? `${code}: ${e.message ?? ""}`.trim() : e?.message || String(error);
 }
 
@@ -69,7 +69,7 @@ function getVia(target: URL, ip: string, timeoutMs: number): Promise<{ status: n
 }
 
 const isHealthy = (body: unknown) => (body as { ok?: unknown } | null)?.ok === true;
-const NOT_OURS = "respondió 200 pero no es este servidor (falta ok: true)";
+const NOT_OURS = "answered 200 but it is not this server (no ok: true)";
 
 /**
  * `GET <url>/api/health` until it answers 200 with `{ ok: true }` or `timeoutMs` runs out
@@ -81,7 +81,7 @@ export async function verifyHealth(url: string, timeoutMs = 10_000, deps: Verify
   const host = target.hostname;
   const named = !isIP(host.replace(/^\[|\]$/g, "")) && host !== "localhost";
   const deadline = Date.now() + timeoutMs;
-  let reason = "sin respuesta";
+  let reason = "no response";
   for (;;) {
     const left = deadline - Date.now();
     if (left <= 0) return { ok: false, reason };
@@ -91,22 +91,22 @@ export async function verifyHealth(url: string, timeoutMs = 10_000, deps: Verify
         if (!ip) throw Object.assign(new Error(host), { code: "ENOTFOUND" });
         const { status, body } = await getVia(target, ip, Math.max(1, deadline - Date.now()));
         if (status === 200 && isHealthy(JSON.parse(body || "null"))) {
-          return { ok: true, note: `Este equipo aún no resuelve ${host} (su DNS no lo conoce todavía); desde internet sí responde.` };
+          return { ok: true, note: `This machine cannot resolve ${host} yet (its DNS does not know the name); it does respond from the internet.` };
         }
-        reason = status === 200 ? NOT_OURS : `respondió HTTP ${status}`;
+        reason = status === 200 ? NOT_OURS : `answered HTTP ${status}`;
       } else {
         const response = await fetch(target, { signal: AbortSignal.timeout(left), redirect: "manual" });
         if (response.status === 200) {
           if (isHealthy(await response.json().catch(() => null))) return { ok: true };
           reason = NOT_OURS;
         } else {
-          reason = `respondió HTTP ${response.status}`;
+          reason = `answered HTTP ${response.status}`;
         }
       }
     } catch (error) {
       reason = describe(error, timeoutMs);
       // TLS problems do not fix themselves by waiting
-      if (reason.startsWith("certificado")) return { ok: false, reason };
+      if (reason.startsWith("invalid TLS certificate")) return { ok: false, reason };
     }
     await Bun.sleep(Math.min(250, Math.max(0, deadline - Date.now())));
   }

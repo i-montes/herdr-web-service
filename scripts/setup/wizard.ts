@@ -81,10 +81,10 @@ function onInterrupt(cleanup: () => Promise<void>): () => void {
     running = true;
     void (async () => {
       try {
-        console.log("\nInterrumpido: deshaciendo los cambios a medias...");
+        console.log("\nInterrupted: undoing partial changes...");
         await cleanup();
       } catch (error) {
-        console.log(`No se pudo deshacer todo: ${(error as Error).message}`);
+        console.log(`Could not undo everything: ${(error as Error).message}`);
       } finally {
         process.exit(130);
       }
@@ -109,7 +109,7 @@ export function defaultDeps(): WizardDeps {
     choose,
     confirm: confirmAsync,
     ask: readLine,
-    waitEnter: () => void ask("Pulsa Enter para cerrar."),
+    waitEnter: () => void ask("Press Enter to close."),
     passwordStep,
     lanAddress,
     localAddresses: () => localIPv4s(),
@@ -134,21 +134,21 @@ export function defaultDeps(): WizardDeps {
 }
 
 const MODES: { key: AccessMode; label: string }[] = [
-  { key: "local", label: "Solo este equipo" },
-  { key: "lan", label: "En casa por Wi-Fi (misma red, sin HTTPS)" },
-  { key: "remote", label: "Desde cualquier sitio (túnel con HTTPS)" },
+  { key: "local", label: "This machine only" },
+  { key: "lan", label: "At home over Wi-Fi (same network, no HTTPS)" },
+  { key: "remote", label: "From anywhere (HTTPS tunnel)" },
 ];
 
 const TUNNELS: { key: TunnelKind; label: string }[] = [
-  { key: "tailscale", label: "Tailscale Funnel (recomendado: URL estable, certificado real)" },
-  { key: "portal", label: "Portal (sin cuenta ni sudo)" },
+  { key: "tailscale", label: "Tailscale Funnel (recommended: stable URL, real certificate)" },
+  { key: "portal", label: "Portal (no account, no sudo)" },
 ];
 
 const isMode = (v: string | undefined): v is AccessMode => MODES.some((m) => m.key === v);
 const isTunnel = (v: string | undefined): v is TunnelKind => TUNNELS.some((t) => t.key === v);
 
-export const URL_CHANGE = "La URL cambia: los dispositivos y sesiones abiertos con la URL anterior tendrán que volver a entrar. ¿Continuar?";
-export const PUBLIC_IP = "Esa IP es pública: el servidor quedará expuesto a internet por HTTP sin cifrar. ¿Seguro?";
+export const URL_CHANGE = "The URL changes: devices and sessions opened with the old URL will have to sign in again. Continue?";
+export const PUBLIC_IP = "That IP is public: the server will be exposed to the internet over unencrypted HTTP. Are you sure?";
 
 /**
  * The LAN address to listen on: shown, overridable, validated. The default is the saved HOST while
@@ -158,17 +158,17 @@ async function lanHost(deps: WizardDeps, savedHost: string | undefined): Promise
   const mine = deps.localAddresses();
   const detected = savedHost && mine.includes(savedHost) ? savedHost : deps.lanAddress();
   for (let attempt = 0; attempt < 5; attempt++) {
-    const typed = (await deps.ask(detected ? `IP de este equipo en la red [${detected}]:` : "IP de este equipo en la red:")).trim();
+    const typed = (await deps.ask(detected ? `This machine's network IP [${detected}]:` : "This machine's network IP:")).trim();
     const ip = typed || detected;
     if (!ip) break;
     if (!mine.includes(ip)) {
-      deps.log(`${ip} no es una dirección IPv4 de este equipo. Disponibles: ${mine.join(", ") || "ninguna"}`);
+      deps.log(`${ip} is not an IPv4 address of this machine. Available: ${mine.join(", ") || "none"}`);
       continue;
     }
     if (!isPrivateIPv4(ip) && !(await deps.confirm(PUBLIC_IP, false))) continue;
     return ip;
   }
-  throw new SetupAborted("No hay una dirección IPv4 de red local válida: conecta este equipo a la red y vuelve a intentarlo.");
+  throw new SetupAborted("No valid local network IPv4 address: connect this machine to the network and try again.");
 }
 
 /** Step 7b: never fatal, the server works without it (the web chat just shows no usage). */
@@ -177,35 +177,35 @@ function statusLineStep(deps: WizardDeps): void {
   try {
     result = deps.installStatusLine();
   } catch (error) {
-    deps.log(`No se pudo registrar la status line de Claude Code: ${(error as Error).message}`);
-    deps.log("El chat web no mostrará el contexto ni los límites del plan de Claude.");
+    deps.log(`Could not register the Claude Code status line: ${(error as Error).message}`);
+    deps.log("The web chat will not show Claude's context or plan limits.");
     return;
   }
   switch (result.status) {
     case "installed":
-      return deps.log("Status line de Claude Code: instalada (contexto y límites del plan para el chat web)");
+      return deps.log("Claude Code status line: installed (context and plan limits for the web chat)");
     case "updated":
-      return deps.log("Status line de Claude Code: actualizada");
+      return deps.log("Claude Code status line: updated");
     case "unchanged":
-      return deps.log("Status line de Claude Code: sin cambios");
+      return deps.log("Claude Code status line: unchanged");
     case "chained":
-      return deps.log(`Status line de Claude Code: instalada; la que había (${result.previous}) se sigue mostrando delante`);
+      return deps.log(`Claude Code status line: installed; the previous one (${result.previous}) still shows first`);
     case "no-claude":
-      return deps.log("Claude Code no está instalado: el chat web no mostrará su contexto ni los límites del plan. Vuelve a ejecutar la configuración después de instalarlo.");
+      return deps.log("Claude Code is not installed: the web chat will not show its context or plan limits. Run setup again after installing it.");
     case "unreadable":
-      deps.log(`No se pudo leer ${result.detail}`);
-      return deps.log("Status line de Claude Code: sin instalar. Arregla el archivo y vuelve a ejecutar la configuración.");
+      deps.log(`Could not read ${result.detail}`);
+      return deps.log("Claude Code status line: not installed. Fix the file and run setup again.");
   }
 }
 
 export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void> {
   const { log, port } = deps;
-  log("Herdr Web Service — configuración\n");
+  log("Herdr Web Service — setup\n");
 
   // 0. preflight
   const pf = await deps.preflight();
   if (!pf.ok) {
-    log("No se puede continuar:");
+    log("Cannot continue:");
     for (const p of pf.problems) log(`  - ${p}`);
     throw new SetupAborted("");
   }
@@ -215,7 +215,7 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
   const savedPort = Number(saved.PORT) || port;
 
   // 1. mode
-  const mode = (await deps.choose("¿Desde dónde vas a usar el cliente web?", MODES, isMode(saved.ACCESS_MODE) ? saved.ACCESS_MODE : "local")) as AccessMode;
+  const mode = (await deps.choose("Where will you use the web client from?", MODES, isMode(saved.ACCESS_MODE) ? saved.ACCESS_MODE : "local")) as AccessMode;
   log("");
 
   // 2. password
@@ -241,7 +241,7 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
           freshFunnel = false;
         } else {
           // keep TUNNEL=tailscale in .env: `uninstall` or a re-run will find and retry it
-          log(`No pude apagar Tailscale Funnel: ejecuta \`tailscale funnel --bg ${port} off\`.`);
+          log(`Could not turn off Tailscale Funnel: run \`tailscale funnel --bg ${port} off\`.`);
         }
       }
       if (tunnelIntent && !freshFunnel) {
@@ -268,18 +268,18 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
     if (mode === "remote") {
       if (savedTunnel === "portal" && deps.unitInstalled("tunnel") && saved.PUBLIC_URL) {
         // a second `portal expose` would fight the running service for the same name
-        log(`Portal ya está configurado para publicar este servidor en ${saved.PUBLIC_URL}.`);
-        if (!(await deps.confirm("¿Cambiar el túnel?", false))) {
+        log(`Portal is already set up to publish this server at ${saved.PUBLIC_URL}.`);
+        if (!(await deps.confirm("Change the tunnel?", false))) {
           tunnel = { kind: "portal", url: saved.PUBLIC_URL, persistent: false };
           reused = true;
           if (!(await deps.unitRunning("tunnel"))) {
             await deps.restartUnit("tunnel");
-            log("Servicio del túnel: arrancado de nuevo");
+            log("Tunnel service: restarted");
           }
         }
       }
       if (!tunnel) {
-        const kind = (await deps.choose("Túnel:", TUNNELS, savedTunnel ?? "tailscale")) as TunnelKind;
+        const kind = (await deps.choose("Tunnel:", TUNNELS, savedTunnel ?? "tailscale")) as TunnelKind;
         if (kind === "portal" && deps.unitInstalled("tunnel")) {
           await deps.stopUnit("tunnel");
           portalStopped = true;
@@ -295,7 +295,7 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
           saved.ACCESS_MODE === "remote" && savedTunnel === "tailscale" && (await deps.funnelServes(port));
         freshFunnel = kind === "tailscale" && !configuredFunnel;
         tunnel = await deps.setupTunnel(kind, port);
-        if (tunnel.kind === "portal" && !tunnel.name) throw new Error("Portal no devolvió el nombre del túnel");
+        if (tunnel.kind === "portal" && !tunnel.name) throw new Error("Portal did not return the tunnel name");
       }
       log("");
     }
@@ -304,11 +304,11 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
     const url = canonicalUrl(mode, host, port, tunnel?.url);
     if (saved.PUBLIC_URL && saved.PUBLIC_URL !== url && !URL.canParse(saved.PUBLIC_URL)) {
       // nothing could have been opened with it, so there is nothing to warn about
-      log(`URL guardada no válida (${saved.PUBLIC_URL}): se reemplaza`);
+      log(`Saved URL is not valid (${saved.PUBLIC_URL}): replacing it`);
     } else if (saved.PUBLIC_URL && saved.PUBLIC_URL !== url) {
-      log(`URL guardada: ${saved.PUBLIC_URL}`);
-      log(`URL nueva:    ${url}`);
-      if (!(await deps.confirm(URL_CHANGE, false))) throw new SetupAborted("Cancelado: la configuración guardada no cambió.");
+      log(`Saved URL: ${saved.PUBLIC_URL}`);
+      log(`New URL:   ${url}`);
+      if (!(await deps.confirm(URL_CHANGE, false))) throw new SetupAborted("Cancelled: the saved configuration was not changed.");
     }
     log(`URL: ${url}`);
 
@@ -317,53 +317,53 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
     if (kind !== "tailscale") {
       for (const p of new Set([savedPort, port])) {
         if (!(await deps.funnelServes(p)) && !(savedTunnel === "tailscale" && p === savedPort)) continue;
-        log(`Apagando Tailscale Funnel en el puerto ${p}...`);
+        log(`Turning off Tailscale Funnel on port ${p}...`);
         if (!(await deps.teardownTunnel("tailscale", p)) && (await deps.funnelServes(p))) {
-          throw new SetupAborted(`No pude apagar Tailscale Funnel: ejecuta \`tailscale funnel --bg ${p} off\` y vuelve a ejecutar la configuración.`);
+          throw new SetupAborted(`Could not turn off Tailscale Funnel: run \`tailscale funnel --bg ${p} off\` and run setup again.`);
         }
       }
     }
     if (kind !== "portal" && deps.unitInstalled("tunnel")) {
-      log("Quitando el servicio de Portal del modo anterior...");
+      log("Removing the Portal service from the previous mode...");
       await deps.uninstallUnit("tunnel");
     }
 
     // 5. listening config
-    log(`Guardando ${deps.envPath}`);
+    log(`Saving ${deps.envPath}`);
     writeEnv(deps.envPath, { ACCESS_MODE: mode, HOST: host, PORT: String(port), PUBLIC_URL: url, TUNNEL: kind ?? null });
     committed = true;
 
     // 6. services (a detached server would hold the port the service needs)
     await deps.stopLooseServer();
     const server = await deps.installUnit("server", deps.unitParams);
-    log(`Servicio del servidor: ${server === "installed" ? "instalado" : "sin cambios"}`);
+    log(`Server service: ${server === "installed" ? "installed" : "unchanged"}`);
     if (tunnel?.kind === "portal" && !reused) {
       const result = await deps.installUnit("tunnel", { ...deps.unitParams, portalArgs: [tunnel.bin ?? "portal", ...exposeArgs(tunnel.name!, port)] });
       portalStopped = false;
-      log(`Servicio del túnel: ${result === "installed" ? "instalado" : "sin cambios"}`);
+      log(`Tunnel service: ${result === "installed" ? "installed" : "unchanged"}`);
     }
 
     // 7. restart: a freshly (re)written unit was just started with the new .env; an unchanged one was not
     if (server === "unchanged") {
       await deps.restartUnit("server");
-      log("Servidor reiniciado");
+      log("Server restarted");
     }
     unsubscribe();
     statusLineStep(deps);
 
     // 8. verification
     for (;;) {
-      log(`Verificando ${url}/api/health ...`);
+      log(`Checking ${url}/api/health ...`);
       const health = await deps.verifyHealth(url);
       if (health.ok) {
-        log("Responde.");
+        log("It responds.");
         if (health.note) log(health.note);
         break;
       }
-      log(`No responde: ${health.reason}`);
-      log(`Registro del servidor: ${deps.logFile}`);
-      if (!(await deps.confirm("¿Reintentar?", true))) {
-        throw new SetupAborted("La configuración quedó guardada, pero el servidor no respondió en la URL. Revisa el registro y vuelve a ejecutar la configuración.");
+      log(`Not responding: ${health.reason}`);
+      log(`Server log: ${deps.logFile}`);
+      if (!(await deps.confirm("Retry?", true))) {
+        throw new SetupAborted("The configuration was saved, but the server did not respond at the URL. Check the log and run setup again.");
       }
     }
 
@@ -375,7 +375,7 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
     try {
       await cleanup();
     } catch (undoError) {
-      log(`No se pudo deshacer todo: ${(undoError as Error).message}`);
+      log(`Could not undo everything: ${(undoError as Error).message}`);
     }
     throw error;
   }

@@ -1,5 +1,5 @@
 /**
- * "Nueva sesión": opens a pane in the chosen folder and starts a shell command or an agent in it.
+ * "New session": opens a pane in the chosen folder and starts a shell command or an agent in it.
  *
  * A folder that already has a workspace gets a new tab there; any other folder gets its own
  * workspace. An agent's first message is held here and sent once the agent reports `idle`:

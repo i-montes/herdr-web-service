@@ -42,14 +42,14 @@ const permission = `
 `;
 
 const question = `
-☐ Migraciones
+☐ Migrations
 
-¿Aplico las 2 migraciones antes de correr los tests?
+Apply the 2 migrations before running the tests?
 
-  1. Sí, en la base local
-     Recomendado · no toca staging
-❯ 2. No, solo los tests
-     Algunos fallarán por el esquema
+  1. Yes, on the local database
+     Recommended · does not touch staging
+❯ 2. No, just the tests
+     Some will fail because of the schema
   3. Type something.
 
 Enter to select · ↑/↓ to navigate · Esc to cancel
@@ -70,8 +70,8 @@ test("permission prompt inside a box, wrapped options joined", () => {
 
 test("question: descriptions are not options, the cursor can be anywhere", () => {
   expect(parsePrompt(question)).toEqual({
-    title: "¿Aplico las 2 migraciones antes de correr los tests?",
-    options: ["Sí, en la base local", "No, solo los tests", "Type something."],
+    title: "Apply the 2 migrations before running the tests?",
+    options: ["Yes, on the local database", "No, just the tests", "Type something."],
     selected: 1,
     axis: "vertical",
   });
@@ -135,7 +135,7 @@ const effortSlider = `
 
 test("/effort: a slider read as levels, answered with ←/→", () => {
   const p = parsePrompt(effortSlider);
-  expect(p).toEqual({ title: "Esfuerzo", options: ["low", "medium", "high", "xhigh", "max"], selected: 2, current: 2, axis: "horizontal" });
+  expect(p).toEqual({ title: "Effort", options: ["low", "medium", "high", "xhigh", "max"], selected: 2, current: 2, axis: "horizontal" });
   expect(keysToChoose(p!, 4)).toEqual(["right", "right", "enter"]);
 });
 

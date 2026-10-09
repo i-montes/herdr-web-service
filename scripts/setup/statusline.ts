@@ -55,7 +55,7 @@ function read(file: string): { settings: Settings } | { error: string } {
   try {
     const value: unknown = JSON.parse(readFileSync(file, "utf8"));
     if (value && typeof value === "object" && !Array.isArray(value)) return { settings: value as Settings };
-    return { error: "no es un objeto JSON" };
+    return { error: "not a JSON object" };
   } catch (error) {
     return { error: (error as Error).message };
   }

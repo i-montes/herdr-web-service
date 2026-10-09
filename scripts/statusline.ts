@@ -3,7 +3,7 @@
  * Claude Code status line. Claude Code runs this on every status update with a JSON description
  * of the session on stdin (model, context window, plan rate limits). It is saved per session for
  * the web chat (`<state dir>/claude-status/<session_id>.json`) and a short line is printed for
- * the terminal: `ctx 62% · 5h 34% · sem 12%`. A status line that was there before (saved by
+ * the terminal: `ctx 62% · 5h 34% · wk 12%`. A status line that was there before (saved by
  * `setup` in `<config dir>/claude-statusline.json`) runs first with the same input and its output
  * leads the line.
  *
@@ -46,7 +46,7 @@ const limits = (input["rate_limits"] ?? {}) as Raw;
 const parts = [
   pct(ctx["used_percentage"]) && `ctx ${pct(ctx["used_percentage"])}`,
   pct((limits["five_hour"] as Raw | undefined)?.["used_percentage"]) && `5h ${pct((limits["five_hour"] as Raw)["used_percentage"])}`,
-  pct((limits["seven_day"] as Raw | undefined)?.["used_percentage"]) && `sem ${pct((limits["seven_day"] as Raw)["used_percentage"])}`,
+  pct((limits["seven_day"] as Raw | undefined)?.["used_percentage"]) && `wk ${pct((limits["seven_day"] as Raw)["used_percentage"])}`,
 ].filter(Boolean);
 
 /** Output of the chained status line, "" when there is none or it fails or hangs. */

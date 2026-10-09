@@ -9,5 +9,5 @@ for bin in "$(command -v bun 2>/dev/null)" "${BUN_INSTALL:-$HOME/.bun}/bin/bun" 
     exec "$bin" "$@"
   fi
 done
-echo "No encuentro Bun: instálalo con 'curl -fsSL https://bun.sh/install | bash'." >&2
+echo "Bun not found: install it with 'curl -fsSL https://bun.sh/install | bash'." >&2
 exit 127

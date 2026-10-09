@@ -5,11 +5,11 @@ type Status = "idle" | "checking" | "ok";
 
 /** The server's answer to a failed sign-in, in the words the page shows */
 function describe(error: unknown): string {
-  if (!(error instanceof ApiFailure)) return "No se pudo conectar con el servidor.";
+  if (!(error instanceof ApiFailure)) return "Couldn't reach the server.";
   switch (error.code) {
-    case "invalid_password": return "Contraseña incorrecta.";
-    case "insecure_transport": return "Entra por HTTPS para iniciar sesión.";
-    case "setup_required": return "Falta configurar la contraseña en Herdr.";
+    case "invalid_password": return "Wrong password.";
+    case "insecure_transport": return "Use HTTPS to sign in.";
+    case "setup_required": return "The password hasn't been set in Herdr yet.";
     default: return error.message;
   }
 }
@@ -50,7 +50,7 @@ export function Login({ onDone }: { onDone: () => void }) {
     event.preventDefault();
     if (locked || checking) return;
     if (!password) {
-      setError("Escribe la contraseña.");
+      setError("Enter the password.");
       input.current?.focus();
       return;
     }
@@ -73,7 +73,7 @@ export function Login({ onDone }: { onDone: () => void }) {
   };
 
   const invalid = error !== null || locked;
-  const button = checking ? "Verificando…" : locked ? "Bloqueado" : "Entrar";
+  const button = checking ? "Checking…" : locked ? "Locked" : "Sign in";
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-4 py-6">
@@ -89,7 +89,7 @@ export function Login({ onDone }: { onDone: () => void }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="herdr-pw" className="text-sm font-semibold">Contraseña</label>
+          <label htmlFor="herdr-pw" className="text-sm font-semibold">Password</label>
           <div className="relative flex items-center">
             <input
               ref={input}
@@ -112,7 +112,7 @@ export function Login({ onDone }: { onDone: () => void }) {
             />
             <button
               type="button"
-              aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-label={show ? "Hide password" : "Show password"}
               aria-pressed={show}
               onClick={() => setShow(!show)}
               className="absolute right-1 flex size-11 cursor-pointer items-center justify-center rounded-[10px] text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-accent-ink"
@@ -122,7 +122,7 @@ export function Login({ onDone }: { onDone: () => void }) {
           </div>
           <div id="herdr-pw-msg" aria-live="polite" className="min-h-5">
             {locked ? (
-              <Message icon={<ClockIcon />}>Demasiados intentos. Espera {clock(waitLeft)}.</Message>
+              <Message icon={<ClockIcon />}>Too many attempts. Wait {clock(waitLeft)}.</Message>
             ) : error ? (
               <Message icon={<AlertIcon />}>{error}</Message>
             ) : null}
@@ -137,13 +137,13 @@ export function Login({ onDone }: { onDone: () => void }) {
             onChange={(e) => setRemember(e.target.checked)}
             className="m-0 size-5 cursor-pointer accent-accent"
           />
-          <span>Recordar este navegador</span>
+          <span>Remember this browser</span>
         </label>
 
         {status === "ok" ? (
           <div role="status" className="flex h-13 items-center justify-center gap-2.5 rounded-full bg-ok text-base font-semibold text-ok-ink">
             <CheckIcon />
-            Entrando…
+            Signing in…
           </div>
         ) : (
           <button

@@ -65,7 +65,7 @@ function effortSlider(lines: string[]): PanePrompt | null {
   });
   let selected = 0;
   columns.forEach((c, i) => Math.abs(c - at) < Math.abs(columns[selected]! - at) && (selected = i));
-  return { title: "Esfuerzo", options: [...EFFORT_LEVELS], selected, current: selected, axis: "horizontal" };
+  return { title: "Effort", options: [...EFFORT_LEVELS], selected, current: selected, axis: "horizontal" };
 }
 
 export function parsePrompt(screen: string): PanePrompt | null {

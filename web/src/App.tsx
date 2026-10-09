@@ -14,12 +14,12 @@ export function App() {
   useEffect(() => void refresh(), []);
 
   if (error) return <Centered><p className="text-danger-ink">{error}</p></Centered>;
-  if (!session) return <Centered><p className="text-muted">Cargando…</p></Centered>;
+  if (!session) return <Centered><p className="text-muted">Loading…</p></Centered>;
   if (session.setup_required) {
     return (
       <Centered>
-        <h1 className="text-xl font-semibold">Falta configurar la contraseña</h1>
-        <p className="mt-2 max-w-sm text-sm text-muted">En Herdr, ejecuta la acción <b>Web: setup</b> del plugin (o <code>bun scripts/plugin.ts setup</code>) y vuelve a cargar.</p>
+        <h1 className="text-xl font-semibold">Password not set yet</h1>
+        <p className="mt-2 max-w-sm text-sm text-muted">In Herdr, run the plugin's <b>Web: setup</b> action (or <code>bun scripts/plugin.ts setup</code>) and reload.</p>
       </Centered>
     );
   }

@@ -28,21 +28,21 @@ async function run(previous?: string): Promise<{ out: string; ms: number }> {
 }
 
 test("alone: prints our segments and saves the status for the web", async () => {
-  expect((await run()).out).toBe("ctx 62% · 5h 34% · sem 12%");
+  expect((await run()).out).toBe("ctx 62% · 5h 34% · wk 12%");
   expect(existsSync(join(dir, "state", "claude-status", "abcdef12-3456.json"))).toBe(true);
 });
 
 test("chained: the previous status line gets the same input and goes first", async () => {
   const { out } = await run(`printf 'mine:'; grep -o abcdef12 ; echo`);
-  expect(out).toBe("mine:abcdef12 · ctx 62% · 5h 34% · sem 12%");
+  expect(out).toBe("mine:abcdef12 · ctx 62% · 5h 34% · wk 12%");
 });
 
 test("a failing previous status line is skipped", async () => {
-  expect((await run("echo broken >&2; exit 3")).out).toBe("ctx 62% · 5h 34% · sem 12%");
+  expect((await run("echo broken >&2; exit 3")).out).toBe("ctx 62% · 5h 34% · wk 12%");
 });
 
 test("a hung previous status line is cut off after 2 s", async () => {
   const { out, ms } = await run("sleep 10; echo late");
-  expect(out).toBe("ctx 62% · 5h 34% · sem 12%");
+  expect(out).toBe("ctx 62% · 5h 34% · wk 12%");
   expect(ms).toBeLessThan(4000);
 });

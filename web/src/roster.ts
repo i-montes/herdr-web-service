@@ -82,10 +82,10 @@ export function useRoster(initiallyConnected: boolean): { roster: Roster; connec
   return { roster, connected, loaded, live };
 }
 
-/** hash routes: `#/` is Inicio, `#/sesion/<pane id>` a session */
+/** hash routes: `#/` is Home, `#/session/<pane id>` a session (the old `#/sesion/` still opens) */
 export function useRoute(): { paneId: string | null; go: (paneId: string | null) => void } {
   const read = () => {
-    const m = /^#\/sesion\/(.+)$/.exec(location.hash);
+    const m = /^#\/(?:session|sesion)\/(.+)$/.exec(location.hash);
     return m ? decodeURIComponent(m[1]!) : null;
   };
   const [paneId, setPaneId] = useState(read);
@@ -95,9 +95,9 @@ export function useRoute(): { paneId: string | null; go: (paneId: string | null)
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
   const go = (id: string | null) => {
-    location.hash = id ? `#/sesion/${encodeURIComponent(id)}` : "#/";
+    location.hash = id ? `#/session/${encodeURIComponent(id)}` : "#/";
   };
   return { paneId, go };
 }
 
-export const sessionHref = (paneId: string) => `#/sesion/${encodeURIComponent(paneId)}`;
+export const sessionHref = (paneId: string) => `#/session/${encodeURIComponent(paneId)}`;

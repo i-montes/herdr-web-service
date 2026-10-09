@@ -40,7 +40,7 @@ test("isValidName", () => {
 test("ensureInstalled fails when the installer fails", async () => {
   const run: Runner = async (argv) =>
     argv[0] === "bash" ? { code: 1, stdout: "", stderr: "" } : { code: 127, stdout: "", stderr: "" };
-  await expect(ensureInstalled(run)).rejects.toThrow("Falló la instalación");
+  await expect(ensureInstalled(run)).rejects.toThrow("installation failed");
 });
 
 test("ensureInstalled fails when the binary is still missing", async () => {
@@ -49,7 +49,7 @@ test("ensureInstalled fails when the binary is still missing", async () => {
     calls.push(argv);
     return argv[0] === "bash" ? { code: 0, stdout: "", stderr: "" } : { code: 127, stdout: "", stderr: "" };
   };
-  await expect(ensureInstalled(run)).rejects.toThrow("no se encuentra");
+  await expect(ensureInstalled(run)).rejects.toThrow("cannot be found");
   expect(calls.find((c) => c[0] === "bash")?.[2]).toContain("set -o pipefail");
 });
 

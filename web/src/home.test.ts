@@ -35,7 +35,7 @@ test("filter and search narrow the cards but not the sidebar", () => {
 
 test("session names fall back to the agent, then the folder", () => {
   expect(sessionName(pane({ title: "x" }))).toBe("x");
-  expect(sessionName(pane({ title: "x", label: "mi-sesion" }))).toBe("mi-sesion");
+  expect(sessionName(pane({ title: "x", label: "my-session" }))).toBe("my-session");
   expect(sessionName(pane({ agent: "codex" }))).toBe("Codex");
   expect(sessionName(pane({ agent: null, cwd: "~/p/lumo/web" }))).toBe("web");
   expect(agentLook("gemini")).toMatchObject({ label: "Gemini", initial: "G" });
@@ -45,9 +45,9 @@ test("session names fall back to the agent, then the folder", () => {
 test("ago", () => {
   const now = 10_000_000;
   expect(ago(null, now)).toBeNull();
-  expect(ago(now - 3_000, now)).toBe("ahora");
-  expect(ago(now - 30_000, now)).toBe("hace 30 s");
-  expect(ago(now - 120_000, now)).toBe("hace 2 min");
-  expect(ago(now - 3 * 3_600_000, now)).toBe("hace 3 h");
-  expect(ago(now - 30 * 3_600_000, now)).toBe("ayer");
+  expect(ago(now - 3_000, now)).toBe("just now");
+  expect(ago(now - 30_000, now)).toBe("30s ago");
+  expect(ago(now - 120_000, now)).toBe("2 min ago");
+  expect(ago(now - 3 * 3_600_000, now)).toBe("3h ago");
+  expect(ago(now - 30 * 3_600_000, now)).toBe("yesterday");
 });

@@ -139,7 +139,7 @@ Details in `CLAUDE.md` (rules H1–H9).
 
 The chat shows Claude's context and plan limits thanks to Claude Code's status line. The wizard
 registers it in `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR`), and it also prints
-`ctx 62% · 5h 34% · sem 12%` at the bottom of the terminal.
+`ctx 62% · 5h 34% · wk 12%` at the bottom of the terminal.
 
 If you already had a status line, it is not replaced: it keeps running and its text comes first.
 Uninstalling restores the original.

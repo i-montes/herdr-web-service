@@ -41,18 +41,18 @@ export async function ensureInstalled(run: Runner = defaultRun): Promise<string>
   const have = await tailscaleBin(run);
   if (have) return have;
   if (process.platform === "darwin") {
-    console.log("Tailscale no está instalado.");
-    console.log("Instala la app de Tailscale (https://tailscale.com/download/mac o la Mac App Store),");
-    console.log("inicia sesión en ella y vuelve a ejecutar la configuración.");
-    throw new Error("Tailscale no está instalado");
+    console.log("Tailscale is not installed.");
+    console.log("Install the Tailscale app (https://tailscale.com/download/mac or the Mac App Store),");
+    console.log("sign in to it and run setup again.");
+    throw new Error("Tailscale is not installed");
   }
-  console.log("Tailscale no está instalado. El script oficial de instalación pedirá sudo.");
-  if (!confirm("¿Instalar Tailscale ahora?", true)) throw new Error("Instalación de Tailscale cancelada");
+  console.log("Tailscale is not installed. The official install script will ask for sudo.");
+  if (!confirm("Install Tailscale now?", true)) throw new Error("Tailscale installation cancelled");
   // pipefail: a failed curl must not look like a successful (empty) sh run
   const r = await run(["bash", "-c", "set -o pipefail; curl -fsSL https://tailscale.com/install.sh | sh"], { inherit: true });
-  if (r.code !== 0) throw new Error("Falló la instalación de Tailscale");
+  if (r.code !== 0) throw new Error("Tailscale installation failed");
   const bin = await tailscaleBin(run);
-  if (!bin) throw new Error("Tailscale se instaló pero el comando `tailscale` no responde");
+  if (!bin) throw new Error("Tailscale was installed but the `tailscale` command does not respond");
   return bin;
 }
 
@@ -62,23 +62,23 @@ async function status(bin: string, run: Runner) {
   try {
     return parseStatus(r.stdout);
   } catch {
-    throw new Error(`No se pudo leer el estado de Tailscale: ${r.stderr.trim() || r.stdout.trim()}`);
+    throw new Error(`Could not read the Tailscale status: ${r.stderr.trim() || r.stdout.trim()}`);
   }
 }
 
 export async function ensureLoggedIn(bin: string, run: Runner = defaultRun): Promise<void> {
   if ((await status(bin, run)).state === "Running") return;
-  console.log("Tailscale necesita iniciar sesión: abre el link que aparezca.");
+  console.log("Tailscale needs you to sign in: open the link it shows.");
   const sudo = process.platform === "darwin" ? [] : ["sudo"];
   // tee: `up` prints the login link and waits for it. Never `login`: it resets the host's settings.
   let r = await run([...sudo, bin, "up"], { tee: true });
   const keep = r.code === 0 ? null : upKeepFlags(`${r.stdout}\n${r.stderr}`);
   if (keep) {
-    console.log(`Se conservan los ajustes que ya tenía Tailscale en este equipo (${keep.join(" ")}).`);
+    console.log(`Keeping the settings Tailscale already had on this machine (${keep.join(" ")}).`);
     r = await run([...sudo, bin, "up", ...keep], { tee: true });
   }
-  if (r.code !== 0) throw new Error("`tailscale up` falló");
-  if ((await status(bin, run)).state !== "Running") throw new Error("Tailscale no quedó conectado");
+  if (r.code !== 0) throw new Error("`tailscale up` failed");
+  if ((await status(bin, run)).state !== "Running") throw new Error("Tailscale did not end up connected");
 }
 
 /** Linux only: lets this user drive Funnel without sudo. The macOS app needs no operator. */
@@ -93,27 +93,27 @@ export async function ensureOperator(bin: string, run: Runner = defaultRun, plat
   } catch {
     /* unreadable: setting it again is harmless */
   }
-  console.log("Se ejecutará `sudo tailscale set --operator` para no pedir sudo en los pasos siguientes.");
+  console.log("Running `sudo tailscale set --operator` so the next steps do not need sudo.");
   const r = await run(["sudo", bin, "set", `--operator=${user}`], { inherit: true });
-  if (r.code !== 0) throw new Error("No se pudo fijar el operador de Tailscale");
+  if (r.code !== 0) throw new Error("Could not set the Tailscale operator");
 }
 
 export async function ensureFunnel(port: number, bin: string, run: Runner = defaultRun): Promise<string> {
-  console.log("Activando Tailscale Funnel. Si Tailscale muestra un enlace para habilitarlo en tu tailnet, ábrelo: seguirá solo.");
+  console.log("Enabling Tailscale Funnel. If Tailscale shows a link to enable it on your tailnet, open it: setup continues on its own.");
   for (;;) {
     // tee: recent CLIs print the enable link and wait for it instead of exiting
     const r = await run([bin, "funnel", "--bg", String(port)], { tee: true });
     if (r.code === 0) break;
     const out = `${r.stdout}\n${r.stderr}`;
-    if (/access denied/i.test(out)) throw new Error(`tailscale funnel sin permiso (falta el operator de Tailscale): ${out.trim()}`);
+    if (/access denied/i.test(out)) throw new Error(`tailscale funnel was denied (the Tailscale operator is not set): ${out.trim()}`);
     const link = enableLinkFrom(out);
-    if (!link) throw new Error(`tailscale funnel falló: ${out.trim()}`);
-    console.log("Funnel no está habilitado en tu tailnet. Ábrelo y actívalo:");
+    if (!link) throw new Error(`tailscale funnel failed: ${out.trim()}`);
+    console.log("Funnel is not enabled on your tailnet. Open this link and turn it on:");
     console.log(`  ${link}`);
-    if (!confirm("¿Listo? Enter para reintentar", true)) throw new Error("Funnel no habilitado");
+    if (!confirm("Done? Press Enter to retry", true)) throw new Error("Funnel not enabled");
   }
   const { dnsName } = await status(bin, run);
-  if (!dnsName) throw new Error("Tailscale no reporta un nombre DNS para este equipo");
+  if (!dnsName) throw new Error("Tailscale does not report a DNS name for this machine");
   return funnelUrl(dnsName);
 }
 

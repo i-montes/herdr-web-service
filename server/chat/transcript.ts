@@ -38,7 +38,7 @@ function taskNotice(text: string): string | null {
   if (!/^\s*<task-notification>/.test(text)) return null;
   const summary = /<summary>([\s\S]*?)<\/summary>/.exec(text)?.[1]?.trim();
   const status = /<status>([^<]*)<\/status>/.exec(text)?.[1]?.trim();
-  return [summary || "Tarea en segundo plano", status && status !== "completed" ? `(${status})` : ""].filter(Boolean).join(" ");
+  return [summary || "Background task", status && status !== "completed" ? `(${status})` : ""].filter(Boolean).join(" ");
 }
 
 /** what a user string shows: reminders stripped, pasted blocks unwrapped; null for Claude Code's own bookkeeping */
@@ -55,7 +55,7 @@ function resultText(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
-      .map((b) => (typeof b === "object" && b && (b as Raw)["type"] === "text" ? str((b as Raw)["text"]) : (b as Raw)?.["type"] === "image" ? "[imagen]" : ""))
+      .map((b) => (typeof b === "object" && b && (b as Raw)["type"] === "text" ? str((b as Raw)["text"]) : (b as Raw)?.["type"] === "image" ? "[image]" : ""))
       .filter(Boolean)
       .join("\n");
   }
@@ -116,7 +116,7 @@ export class Transcript {
     const at = str(o["timestamp"]) || null;
 
     if (type === "system" && o["subtype"] === "compact_boundary") {
-      this.items.push({ kind: "divider", id, text: "Conversación compactada" });
+      this.items.push({ kind: "divider", id, text: "Conversation compacted" });
       return;
     }
     if (type === "system" && o["subtype"] === "local_command") {
@@ -136,7 +136,7 @@ export class Transcript {
       // Claude Code records a background task's completion as a user line: it is a notice
       const notice = typeof content === "string" ? taskNotice(content) : null;
       if (notice || (o["origin"] as Raw | undefined)?.["kind"] === "task-notification") {
-        this.items.push({ kind: "divider", id, text: `Tarea en segundo plano: ${notice ?? "terminó"}` });
+        this.items.push({ kind: "divider", id, text: `Background task: ${notice ?? "finished"}` });
         return;
       }
       if (typeof content === "string") {
@@ -198,7 +198,7 @@ export class Transcript {
       if (reason !== "absorbed_mid_turn") return;
       const notice = taskNotice(content);
       const text = userText(content);
-      if (notice) this.items.push({ kind: "divider", id, text: `Tarea en segundo plano: ${notice}` });
+      if (notice) this.items.push({ kind: "divider", id, text: `Background task: ${notice}` });
       else if (text) this.items.push({ kind: "user", id, text, at });
     }
   }

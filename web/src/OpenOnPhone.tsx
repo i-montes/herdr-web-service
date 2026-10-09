@@ -26,7 +26,7 @@ export function OpenOnPhone({ access, className = "" }: { access: SessionInfo["a
     <>
       <button type="button" onClick={() => setOpen(true)} className={`hidden min-h-10 cursor-pointer items-center gap-2 text-sm text-muted hover:text-ink lg:flex ${className}`}>
         <Icon d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM11 18h2" size={16} />
-        Abrir en el móvil
+        Open on phone
       </button>
       {/* portal: the button lives in a sticky sidebar, whose stacking context would trap the dialog */}
       {open && createPortal(<PhoneDialog access={access} onClose={() => setOpen(false)} />, document.body)}
@@ -69,37 +69,37 @@ export function PhoneDialog({ access, onClose }: { access: SessionInfo["access"]
       <div aria-hidden="true" className="fixed inset-0 bg-dialog-scrim" onClick={onClose} />
       <div role="dialog" aria-modal="true" aria-labelledby="phone-title" className="relative flex w-full max-w-[420px] flex-col gap-5 rounded-3xl border border-line bg-surface p-6 shadow-dialog">
         <div className="flex items-center gap-3">
-          <h2 id="phone-title" className="text-[26px] font-extrabold tracking-[-0.03em]">Abrir en el móvil</h2>
-          <button type="button" onClick={onClose} aria-label="Cerrar" autoFocus className="ml-auto flex size-11 cursor-pointer items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-ink">
+          <h2 id="phone-title" className="text-[26px] font-extrabold tracking-[-0.03em]">Open on phone</h2>
+          <button type="button" onClick={onClose} aria-label="Close" autoFocus className="ml-auto flex size-11 cursor-pointer items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-ink">
             <Icon d="M6 6l12 12M18 6L6 18" size={18} width={2.2} />
           </button>
         </div>
 
         {"url" in target ? (
           <>
-            <p className="text-[15px] text-muted">Escanéalo con la cámara del móvil y entra con tu contraseña.</p>
+            <p className="text-[15px] text-muted">Scan it with your phone's camera and sign in with your password.</p>
             <div className="self-center rounded-2xl bg-white p-4">
               <Qr text={target.url} size={232} />
             </div>
-            <button type="button" onClick={() => void copy(target.url)} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line bg-inset px-3.5 text-left font-mono text-[13px]" title="Copiar">
+            <button type="button" onClick={() => void copy(target.url)} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line bg-inset px-3.5 text-left font-mono text-[13px]" title="Copy">
               <span className="min-w-0 flex-1 truncate">{target.url}</span>
-              <span className="font-sans text-sm font-semibold text-accent-ink">{copied ? "Copiada" : "Copiar"}</span>
+              <span className="font-sans text-sm font-semibold text-accent-ink">{copied ? "Copied" : "Copy"}</span>
             </button>
             {access?.mode === "lan" ? (
               <p className="text-[13px] text-muted">
-                El móvil tiene que estar en la misma Wi-Fi. Para instalarla como app hace falta HTTPS: activa el modo remoto con <code className="font-mono">setup</code>.
+                The phone must be on the same Wi-Fi. Installing it as an app needs HTTPS: turn on remote mode with <code className="font-mono">setup</code>.
               </p>
             ) : (
               <p className="text-[13px] text-muted">
-                Para tenerla como app: en iPhone, Compartir → «Añadir a pantalla de inicio»; en Android, menú → «Instalar app».
+                To use it as an app: on iPhone, Share → “Add to Home Screen”; on Android, menu → “Install app”.
               </p>
             )}
           </>
         ) : (
           <p className="text-[15px] text-muted">
             {target.reason === "local"
-              ? "Ahora mismo Herdr Web solo acepta conexiones de este equipo, así que el móvil no podría abrirla. Ejecuta la acción setup de Herdr y elige el modo Wi-Fi (casa) o remoto."
-              : "No hay una dirección pública configurada. Ejecuta la acción setup de Herdr para fijarla."}
+              ? "Right now Herdr Web only accepts connections from this computer, so your phone couldn't open it. Run the Herdr setup action and choose Wi-Fi (home) or remote mode."
+              : "No public address is configured. Run the Herdr setup action to set one."}
           </p>
         )}
       </div>
@@ -119,7 +119,7 @@ function Qr({ text, size }: { text: string; size: number }) {
     return { n, d: dark.join("") };
   }, [text]);
   return (
-    <svg role="img" aria-label={`Código QR de ${text}`} width={size} height={size} viewBox={`0 0 ${cells.n} ${cells.n}`} shapeRendering="crispEdges">
+    <svg role="img" aria-label={`QR code for ${text}`} width={size} height={size} viewBox={`0 0 ${cells.n} ${cells.n}`} shapeRendering="crispEdges">
       <path d={cells.d} fill="#16161a" />
     </svg>
   );

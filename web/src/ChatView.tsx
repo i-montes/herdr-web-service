@@ -42,8 +42,9 @@ async function asUploadable(file: File): Promise<Blob> {
 }
 
 /** how an image travels inside a message: the agent reads the path */
-const imageToken = (path: string) => `[imagen: ${path}]`;
-const IMAGE_TOKEN = /\[imagen: ([^\]]+)\]/g;
+const imageToken = (path: string) => `[image: ${path}]`;
+/** also the Spanish `[imagen: …]` that earlier versions sent, so old conversations keep their thumbnails */
+const IMAGE_TOKEN = /\[(image|imagen): ([^\]]+)\]/g;
 const UPLOAD_NAME = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|gif|webp))$/;
 const FAST_POLL_MS = 600;
 
@@ -132,7 +133,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
     setError(null);
     for (const file of files) {
       if (!file.type.startsWith("image/")) {
-        setError("Solo se pueden adjuntar imágenes.");
+        setError("Only images can be attached.");
         continue;
       }
       // not crypto.randomUUID: browsers only offer it on HTTPS, and the LAN mode serves plain HTTP
@@ -145,7 +146,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
         })
         .then(
         (saved) => setAttachments((list) => list.map((a) => (a.id === id ? { ...a, path: saved.path } : a))),
-        (e: Error) => setAttachments((list) => list.map((a) => (a.id === id ? { ...a, error: e.message === "too_large" ? "Pesa más de 10 MB" : "No se pudo subir" } : a))),
+        (e: Error) => setAttachments((list) => list.map((a) => (a.id === id ? { ...a, error: e.message === "too_large" ? "Larger than 10 MB" : "Upload failed" } : a))),
       );
     }
   };
@@ -192,7 +193,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
       setAtBottom(true);
       pollNow.current(true);
     } catch {
-      setError("No se pudo enviar el mensaje.");
+      setError("Couldn't send the message.");
     } finally {
       setSending(false);
       composer.current?.focus();
@@ -205,7 +206,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
       await api.input(paneId, { keys: ["esc"] });
       pollNow.current(true);
     } catch {
-      setError("No se pudo detener.");
+      setError("Couldn't stop.");
     }
   };
 
@@ -215,7 +216,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
       await api.input(paneId, { keys: ["esc"] });
       pollNow.current(true);
     } catch {
-      setError("No se pudo cancelar.");
+      setError("Couldn't cancel.");
     }
   };
 
@@ -230,7 +231,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
         setTimeout(() => composer.current?.focus(), 50);
       }
     } catch (e) {
-      setError(e instanceof ApiFailure && e.code === "no_prompt" ? "La pregunta ya cambió; revisa la terminal." : "No se pudo responder.");
+      setError(e instanceof ApiFailure && e.code === "no_prompt" ? "The question has changed; check the terminal." : "Couldn't answer.");
       pollNow.current();
     }
   };
@@ -303,18 +304,18 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
         <div className="flex w-full max-w-[820px] flex-col gap-[18px]">
           {chat?.source === "guess" && (
             <p className="rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] text-muted">
-              Conversación elegida por carpeta. Si no es la de esta sesión, reinicia el agente en ella y Herdr la identificará.
+              Conversation picked by folder. If it isn't this session's, restart the agent in it and Herdr will identify it.
             </p>
           )}
-          {chat && chat.hidden > 0 && <p className="text-center text-[13px] text-muted">{chat.hidden} elementos anteriores no se muestran</p>}
+          {chat && chat.hidden > 0 && <p className="text-center text-[13px] text-muted">{chat.hidden} earlier items not shown</p>}
 
-          {!loaded && <p className="py-16 text-center text-muted">Cargando conversación…</p>}
+          {!loaded && <p className="py-16 text-center text-muted">Loading conversation…</p>}
 
           {empty && !prompt && (
             <div className="flex flex-col items-center gap-2.5 px-4 py-16 text-center">
               <AgentTile agent={pane.agent} className="size-14 rounded-2xl text-[22px] font-bold" />
-              <span className="text-2xl font-bold tracking-[-0.02em]">{look.label} está listo</span>
-              <span className="text-[15px] text-muted">Escribe abajo lo que quieres que haga.</span>
+              <span className="text-2xl font-bold tracking-[-0.02em]">{look.label} is ready</span>
+              <span className="text-[15px] text-muted">Type below what you want it to do.</span>
             </div>
           )}
 
@@ -325,7 +326,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
           {chat?.queued.map((text, i) => (
             <div key={`q${i}`} className="flex max-w-[85%] flex-col items-end gap-1 self-end">
               <UserBubble text={text} queued />
-              <span className="font-mono text-[11px] text-muted">en cola</span>
+              <span className="font-mono text-[11px] text-muted">queued</span>
             </div>
           ))}
 
@@ -343,7 +344,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
                 <span className="size-1.5 animate-pulse rounded-full bg-accent-ink opacity-60 [animation-delay:150ms]" />
                 <span className="size-1.5 animate-pulse rounded-full bg-accent-ink opacity-30 [animation-delay:300ms]" />
               </span>
-              Trabajando…
+              Working…
             </div>
           )}
         </div>
@@ -351,7 +352,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
 
       {choosing && prompt && (
         <div className="sticky bottom-0 z-10 hidden justify-center border-t border-line bg-surface px-4 py-3 text-[13px] text-muted lg:flex">
-          ↑ ↓ para moverte · 1–{Math.min(prompt.options.length, 9)} para elegir · Enter confirma · Esc cancela
+          ↑ ↓ to move · 1–{Math.min(prompt.options.length, 9)} to pick · Enter confirms · Esc cancels
         </div>
       )}
       <div className={`sticky bottom-0 z-10 justify-center border-t border-line bg-surface px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] ${choosing ? "hidden" : "flex"}`}>
@@ -363,18 +364,18 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
               className="absolute -top-14 left-1/2 flex h-9 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] font-semibold shadow-fab"
             >
               <Icon d="M12 5v14M5 12l7 7 7-7" size={14} width={2.4} />
-              Ir al final
+              Jump to bottom
             </button>
           )}
           {error && <p role="alert" className="text-sm text-danger-ink">{error}</p>}
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2" aria-label="Imágenes adjuntas">
+            <div className="flex flex-wrap gap-2" aria-label="Attached images">
               {attachments.map((a) => (
                 <div key={a.id} className="relative size-16 overflow-hidden rounded-xl border border-line bg-inset">
-                  <img src={a.preview} alt="Imagen adjunta" className={`size-full object-cover ${a.path ? "" : "opacity-50"}`} />
-                  {!a.path && !a.error && <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold">Subiendo…</span>}
+                  <img src={a.preview} alt="Attached image" className={`size-full object-cover ${a.path ? "" : "opacity-50"}`} />
+                  {!a.path && !a.error && <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold">Uploading…</span>}
                   {a.error && <span className="absolute inset-x-0 bottom-0 bg-danger px-1 text-center text-[10px] text-danger-ink">{a.error}</span>}
-                  <button type="button" onClick={() => removeImage(a.id)} aria-label="Quitar imagen" className="absolute top-1 right-1 flex size-6 cursor-pointer items-center justify-center rounded-full bg-inverse/80 text-inverse-ink">
+                  <button type="button" onClick={() => removeImage(a.id)} aria-label="Remove image" className="absolute top-1 right-1 flex size-6 cursor-pointer items-center justify-center rounded-full bg-inverse/80 text-inverse-ink">
                     <Icon d="M6 6l12 12M18 6L6 18" size={12} width={2.6} />
                   </button>
                 </div>
@@ -399,10 +400,10 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
                 e.target.value = "";
               }}
             />
-            <button type="button" onClick={() => picker.current?.click()} aria-label="Adjuntar imagen" title="Adjuntar imagen" className="flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line text-muted hover:bg-sunken hover:text-ink">
+            <button type="button" onClick={() => picker.current?.click()} aria-label="Attach image" title="Attach image" className="flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line text-muted hover:bg-sunken hover:text-ink">
               <Icon d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9" size={20} />
             </button>
-            <label htmlFor="chat-compose" className="sr-only">Mensaje al agente</label>
+            <label htmlFor="chat-compose" className="sr-only">Message to the agent</label>
             <textarea
               id="chat-compose"
               ref={composer}
@@ -421,18 +422,18 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
                   void send();
                 }
               }}
-              placeholder={`Escríbele a ${look.label}`}
+              placeholder={`Message ${look.label}`}
               className="max-h-[180px] min-h-12 flex-1 resize-none rounded-[18px] border border-line bg-canvas px-4 py-3 text-base leading-[1.45] text-ink outline-none placeholder:text-muted focus:border-accent-ink"
             />
             {working && !draft.trim() && attachments.length === 0 ? (
               // while the agent works the send button becomes its stop button (Esc in Claude Code)
-              <button type="button" onClick={stop} aria-label="Detener" title="Detener" className="flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-danger-line text-white">
+              <button type="button" onClick={stop} aria-label="Stop" title="Stop" className="flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-danger-line text-white">
                 <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="5" y="5" width="14" height="14" rx="2.5" fill="currentColor" />
                 </svg>
               </button>
             ) : (
-              <button type="submit" disabled={(!draft.trim() && ready.length === 0) || sending || uploading} aria-label="Enviar" className="flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-white disabled:cursor-default disabled:opacity-50">
+              <button type="submit" disabled={(!draft.trim() && ready.length === 0) || sending || uploading} aria-label="Send" className="flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-white disabled:cursor-default disabled:opacity-50">
                 <Icon d="M12 19V5M5 12l7-7 7 7" size={20} width={2.2} />
               </button>
             )}
@@ -443,17 +444,17 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
   );
 }
 
-/** a message from the person; `[imagen: …]` tokens of uploaded images show as thumbnails */
+/** a message from the person; `[image: …]` tokens of uploaded images show as thumbnails */
 function UserBubble({ text, queued = false }: { text: string; queued?: boolean }) {
   const images: string[] = [];
   const words = text
-    .replace(IMAGE_TOKEN, (_, path: string) => {
+    .replace(IMAGE_TOKEN, (token: string, _word: string, path: string) => {
       const name = UPLOAD_NAME.exec(path.trim())?.[1];
       if (name) {
         images.push(name);
         return "";
       }
-      return `[imagen: ${path}]`;
+      return token;
     })
     .trim();
   return (
@@ -462,7 +463,7 @@ function UserBubble({ text, queued = false }: { text: string; queued?: boolean }
         <div className="flex flex-wrap justify-end gap-1.5">
           {images.map((name) => (
             <a key={name} href={`/api/uploads/${name}`} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-xl border border-line">
-              <img src={`/api/uploads/${name}`} alt="Imagen enviada" loading="lazy" className="max-h-48 max-w-[240px] object-cover" />
+              <img src={`/api/uploads/${name}`} alt="Sent image" loading="lazy" className="max-h-48 max-w-[240px] object-cover" />
             </a>
           ))}
         </div>
@@ -492,7 +493,7 @@ function ChatEntry({ item }: { item: ChatItem }) {
       const done = item.items.filter((t) => t.status === "completed").length;
       return (
         <div className="flex flex-col gap-1.5 rounded-[14px] border border-line bg-surface px-4 py-3.5">
-          <div className="text-[13px] font-semibold text-muted">Plan · {done} de {item.items.length}</div>
+          <div className="text-[13px] font-semibold text-muted">Plan · {done} of {item.items.length}</div>
           {item.items.map((t, i) => (
             <div key={i} className={`flex items-start gap-2.5 text-sm ${t.status === "completed" ? "text-idle-dot line-through" : t.status === "in_progress" ? "font-semibold" : ""}`}>
               <span className={`mt-0.5 size-4 shrink-0 rounded-[5px] ${t.status === "completed" ? "bg-ok-dot" : t.status === "in_progress" ? "border-2 border-accent-ink" : "border-[1.5px] border-line"}`} />
@@ -505,11 +506,11 @@ function ChatEntry({ item }: { item: ChatItem }) {
     case "question":
       return (
         <div className="flex flex-col gap-2 rounded-[14px] border border-line bg-surface px-4 py-3.5">
-          <div className="font-mono text-[11px] tracking-[0.12em] text-muted uppercase">Pregunta</div>
+          <div className="font-mono text-[11px] tracking-[0.12em] text-muted uppercase">Question</div>
           {item.questions.map((q, i) => (
             <div key={i} className="text-[15px] font-semibold">{q.question}</div>
           ))}
-          {item.answer !== null ? <div className="text-sm text-muted">{item.answer}</div> : <div className="text-sm text-muted">Esperando tu respuesta…</div>}
+          {item.answer !== null ? <div className="text-sm text-muted">{item.answer}</div> : <div className="text-sm text-muted">Waiting for your answer…</div>}
         </div>
       );
     case "command":
@@ -562,7 +563,7 @@ function ToolCard({ item }: { item: ToolItem }) {
         ) : item.state === "error" ? (
           <span className="shrink-0 text-xs text-danger-ink">error</span>
         ) : (
-          !diff && <span className="shrink-0 text-xs text-ok-ink">listo</span>
+          !diff && <span className="shrink-0 text-xs text-ok-ink">done</span>
         )}
       </button>
       {open && hasBody && (
@@ -574,7 +575,7 @@ function ToolCard({ item }: { item: ToolItem }) {
                 l.op === "@" ? (
                   // a hunk starts: where in the file
                   <div key={i} className="border-y border-line bg-inset px-3.5 py-0.5 text-[11px] text-muted first:border-t-0">
-                    línea {l.text}
+                    line {l.text}
                   </div>
                 ) : (
                   <div key={i} className={`px-3.5 whitespace-pre-wrap [overflow-wrap:anywhere] ${l.op === "-" ? "bg-danger text-danger-ink" : l.op === "+" ? "bg-ok text-ok-ink" : "text-muted"}`}>
@@ -583,7 +584,7 @@ function ToolCard({ item }: { item: ToolItem }) {
                   </div>
                 ),
               )}
-              {diff.truncated && <div className="px-3.5 py-1.5 text-muted">… (diff recortado)</div>}
+              {diff.truncated && <div className="px-3.5 py-1.5 text-muted">… (diff truncated)</div>}
             </div>
           )}
           {output && (
@@ -612,7 +613,7 @@ function QuestionPrompt({ prompt, question, highlight, onPick, onHover, onCancel
   const title = question.questions.find((q) => prompt.title.includes(q.question.slice(0, 20)))?.question ?? prompt.title;
   return (
     <div role="listbox" aria-label={title} className="flex flex-col gap-3.5 rounded-[18px] bg-accent p-5 text-white">
-      <div className="font-mono text-[11px] tracking-[0.12em] text-question-soft uppercase">Pregunta</div>
+      <div className="font-mono text-[11px] tracking-[0.12em] text-question-soft uppercase">Question</div>
       <div className="text-xl leading-tight font-bold tracking-[-0.01em]">{title}</div>
       <div className="flex flex-col gap-2">
         {prompt.options.map((label, i) => {
@@ -630,7 +631,7 @@ function QuestionPrompt({ prompt, question, highlight, onPick, onHover, onCancel
             >
               <span className={`flex size-[26px] shrink-0 items-center justify-center rounded-[7px] font-mono text-xs ${on && !free ? "bg-[#16161a] text-white" : "bg-question-tile text-white"}`}>{i + 1}</span>
               <span className="flex flex-col gap-px">
-                <span className="text-[15px] font-semibold">{free ? "Escribir otra respuesta…" : label}</span>
+                <span className="text-[15px] font-semibold">{free ? "Type another answer…" : label}</span>
                 {descriptions.get(label) && <span className={`text-[13px] ${on && !free ? "text-[#66645c]" : "text-question-soft"}`}>{descriptions.get(label)}</span>}
               </span>
             </button>
@@ -638,7 +639,7 @@ function QuestionPrompt({ prompt, question, highlight, onPick, onHover, onCancel
         })}
       </div>
       <button type="button" onClick={onCancel} className="min-h-9 cursor-pointer self-start text-[13px] font-semibold text-question-soft underline">
-        Cancelar
+        Cancel
       </button>
     </div>
   );
@@ -650,8 +651,8 @@ function ChoicePrompt({ prompt, highlight, onPick, onHover, onCancel }: MenuProp
   const list = prompt.options.length > 4 || prompt.options.some((o) => o.includes(" · "));
   return (
     <div className="flex flex-col gap-3 rounded-[14px] border border-ask-line bg-ask px-4 py-3.5">
-      <span className="text-[15px] font-semibold">{prompt.title || "El agente espera tu decisión"}</span>
-      <div role="listbox" aria-label={prompt.title || "Opciones"} className={list ? "flex flex-col gap-1.5" : "flex flex-wrap gap-2"}>
+      <span className="text-[15px] font-semibold">{prompt.title || "The agent is waiting for your decision"}</span>
+      <div role="listbox" aria-label={prompt.title || "Options"} className={list ? "flex flex-col gap-1.5" : "flex flex-wrap gap-2"}>
         {prompt.options.map((option, i) => {
           const [label, ...rest] = option.split(" · ");
           const description = rest.join(" · ");
@@ -676,7 +677,7 @@ function ChoicePrompt({ prompt, highlight, onPick, onHover, onCancel }: MenuProp
                   <span className="text-[15px] font-semibold">{label}</span>
                   {description && <span className="text-[13px] text-muted">{description}</span>}
                 </span>
-                {isCurrent && <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-soft-ink">actual</span>}
+                {isCurrent && <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-soft-ink">current</span>}
               </button>
             );
           }
@@ -699,7 +700,7 @@ function ChoicePrompt({ prompt, highlight, onPick, onHover, onCancel }: MenuProp
         })}
       </div>
       <button type="button" onClick={onCancel} className="min-h-9 cursor-pointer self-start text-[13px] font-semibold text-muted underline">
-        Cancelar
+        Cancel
       </button>
     </div>
   );

@@ -22,43 +22,43 @@ export interface Summary {
 const TUNNEL_NAME: Record<TunnelKind, string> = { tailscale: "Tailscale Funnel", portal: "Portal" };
 
 export function renderSummary(s: Summary): string {
-  const lines: string[] = ["", "Listo.", "", `URL: ${s.url}`, "", qrAscii(s.url), ""];
+  const lines: string[] = ["", "Done.", "", `URL: ${s.url}`, "", qrAscii(s.url), ""];
   if (s.mode === "local") {
     lines.push(
-      "Solo este equipo:",
-      "  1. Abre la URL en el navegador de este equipo.",
-      "  2. Entra con tu contraseña.",
-      "  No es accesible desde el celular ni desde otros equipos.",
+      "This machine only:",
+      "  1. Open the URL in this machine's browser.",
+      "  2. Sign in with your password.",
+      "  It cannot be reached from your phone or other machines.",
     );
   } else if (s.mode === "lan") {
     lines.push(
-      "En el celular:",
-      "  1. Conéctalo al mismo Wi-Fi que este equipo.",
-      "  2. Escanea el QR (o escribe la URL) y entra con tu contraseña.",
+      "On your phone:",
+      "  1. Connect it to the same Wi-Fi as this machine.",
+      "  2. Scan the QR code (or type the URL) and sign in with your password.",
       "",
-      "Limitaciones de este modo (sin HTTPS):",
-      "  - sin app instalable",
-      "  - sin push",
-      "  - sin passkeys",
-      "  - la contraseña viaja en claro dentro de la red",
+      "Limitations of this mode (no HTTPS):",
+      "  - no installable app",
+      "  - no push notifications",
+      "  - no passkeys",
+      "  - the password travels unencrypted over the network",
       "",
-      "Si cambia la IP de este equipo, vuelve a ejecutar la configuración.",
+      "If this machine's IP changes, run setup again.",
     );
   } else {
     lines.push(
-      `Túnel: ${s.tunnel ? TUNNEL_NAME[s.tunnel] : "-"} (HTTPS)`,
+      `Tunnel: ${s.tunnel ? TUNNEL_NAME[s.tunnel] : "-"} (HTTPS)`,
       "",
-      "En el celular:",
-      "  1. Escanea el QR (o escribe la URL) desde cualquier red.",
-      "  2. Entra con tu contraseña.",
-      "  3. Opcional: \"Añadir a pantalla de inicio\" en el menú del navegador.",
+      "On your phone:",
+      "  1. Scan the QR code (or type the URL) from any network.",
+      "  2. Sign in with your password.",
+      "  3. Optional: \"Add to Home Screen\" from the browser menu.",
       "",
-      "Sugerencia (no se aplica sola): si este equipo es un servidor con ufw, cierra los puertos entrantes",
-      "salvo SSH; el túnel no necesita ninguno abierto:",
+      "Suggestion (not applied automatically): if this machine is a server with ufw, close incoming",
+      "ports except SSH; the tunnel needs none open:",
       "  sudo ufw default deny incoming && sudo ufw allow 22",
     );
   }
-  const service = s.serviceKind === "launchd" ? "LaunchAgent de macOS" : "servicio systemd de usuario";
-  lines.push("", `El servidor corre como ${service} y arranca solo tras un reinicio.`, `Registro: ${s.logFile}`, "");
+  const service = s.serviceKind === "launchd" ? "macOS LaunchAgent" : "systemd user service";
+  lines.push("", `The server runs as a ${service} and starts on its own after a reboot.`, `Log: ${s.logFile}`, "");
   return lines.join("\n");
 }

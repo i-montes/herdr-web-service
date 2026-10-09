@@ -35,10 +35,10 @@ export const PASSWORD_MIN_LENGTH = 6;
 /** The rules a password must meet, each with whether `plain` meets it (for live indicators). */
 export function passwordRules(plain: string): PasswordRule[] {
   return [
-    { id: "length", label: `mínimo ${PASSWORD_MIN_LENGTH} caracteres`, ok: plain.length >= PASSWORD_MIN_LENGTH },
-    { id: "symbol", label: "un signo (!@#$%…)", ok: /[^\p{L}\p{N}\s]/u.test(plain) },
-    { id: "number", label: "un número", ok: /\p{N}/u.test(plain) },
-    { id: "upper", label: "una mayúscula", ok: /\p{Lu}/u.test(plain) },
+    { id: "length", label: `at least ${PASSWORD_MIN_LENGTH} characters`, ok: plain.length >= PASSWORD_MIN_LENGTH },
+    { id: "symbol", label: "a symbol (!@#$%…)", ok: /[^\p{L}\p{N}\s]/u.test(plain) },
+    { id: "number", label: "a number", ok: /\p{N}/u.test(plain) },
+    { id: "upper", label: "an uppercase letter", ok: /\p{Lu}/u.test(plain) },
   ];
 }
 
@@ -48,7 +48,7 @@ export function passwordValid(plain: string): boolean {
 
 export async function setPassword(plain: string): Promise<void> {
   const failing = passwordRules(plain).filter((rule) => !rule.ok);
-  if (failing.length > 0) throw new Error(`la contraseña no cumple: ${failing.map((rule) => rule.label).join(", ")}`);
+  if (failing.length > 0) throw new Error(`the password needs ${failing.map((rule) => rule.label).join(", ")}`);
   const password_hash = await Bun.password.hash(plain, { algorithm: "argon2id", memoryCost: 65536, timeCost: 3 });
   const data: AuthFile = { password_hash, updated_at: new Date().toISOString() };
   writeFileSync(config.authFile, JSON.stringify(data, null, 2) + "\n", { mode: 0o600 });

@@ -1,8 +1,8 @@
 {
   "name": "Herdr Web",
   "short_name": "Herdr",
-  "description": "Tus agentes de Herdr desde el navegador.",
-  "lang": "es",
+  "description": "Your Herdr agents from the browser.",
+  "lang": "en",
   "id": "/",
   "start_url": "/",
   "scope": "/",

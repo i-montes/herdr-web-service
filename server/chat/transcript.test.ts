@@ -14,20 +14,20 @@ function feed(lines: string[]) {
 
 test("user and assistant text, thinking and internal messages hidden", () => {
   const t = feed([
-    user("Hola, revisa el proyecto"),
+    user("Hi, review the project"),
     user("<command-name>/clear</command-name>"),
-    user("algo", { isMeta: true }),
-    user("Resumen anterior", { isCompactSummary: true }),
-    assistant([{ type: "thinking", thinking: "..." }, { type: "text", text: "Voy a **revisar**." }]),
-    user("texto con <system-reminder>secreto</system-reminder> visible"),
+    user("something", { isMeta: true }),
+    user("Earlier summary", { isCompactSummary: true }),
+    assistant([{ type: "thinking", thinking: "..." }, { type: "text", text: "Let me **review** it." }]),
+    user("text with <system-reminder>secret</system-reminder> visible"),
     "not json",
     line({ type: "attachment" }),
   ]);
   const items = t.snapshot(100).items;
   expect(items.map((i) => i.kind)).toEqual(["user", "command", "assistant", "user"]);
   expect(items[1]).toMatchObject({ kind: "command", command: "/clear" });
-  expect(items[2]).toMatchObject({ kind: "assistant", text: "Voy a **revisar**." });
-  expect(items[3]).toMatchObject({ text: "texto con  visible" });
+  expect(items[2]).toMatchObject({ kind: "assistant", text: "Let me **review** it." });
+  expect(items[3]).toMatchObject({ text: "text with  visible" });
   expect(t.snapshot(100).model).toBe("claude-opus-5-5");
 });
 
@@ -62,17 +62,17 @@ test("edits become diffs", () => {
 });
 
 test("only the latest plan is shown; questions carry their answer", () => {
-  const todos = (s: string) => ({ todos: [{ content: "Revisar", status: "completed" }, { content: "Aplicar", status: s }] });
+  const todos = (s: string) => ({ todos: [{ content: "Review", status: "completed" }, { content: "Apply", status: s }] });
   const t = feed([
     assistant([{ type: "tool_use", id: "p1", name: "TodoWrite", input: todos("pending") }]),
-    assistant([{ type: "tool_use", id: "q", name: "AskUserQuestion", input: { questions: [{ question: "¿Aplico?", options: [{ label: "Sí", description: "local" }, { label: "No", description: "" }] }] } }]),
+    assistant([{ type: "tool_use", id: "q", name: "AskUserQuestion", input: { questions: [{ question: "Apply it?", options: [{ label: "Yes", description: "local" }, { label: "No", description: "" }] }] } }]),
     assistant([{ type: "tool_use", id: "p2", name: "TodoWrite", input: todos("in_progress") }]),
-    user([{ type: "tool_result", tool_use_id: "q", content: "User answered: Sí" }]),
+    user([{ type: "tool_result", tool_use_id: "q", content: "User answered: Yes" }]),
   ]);
   const items = t.snapshot(100).items;
   expect(items.map((i) => i.kind)).toEqual(["question", "plan"]);
-  expect(items[0]).toMatchObject({ questions: [{ question: "¿Aplico?", options: [{ label: "Sí", description: "local" }, { label: "No", description: "" }] }], answer: "User answered: Sí" });
-  expect(items[1]).toMatchObject({ items: [{ text: "Revisar", status: "completed" }, { text: "Aplicar", status: "in_progress" }] });
+  expect(items[0]).toMatchObject({ questions: [{ question: "Apply it?", options: [{ label: "Yes", description: "local" }, { label: "No", description: "" }] }], answer: "User answered: Yes" });
+  expect(items[1]).toMatchObject({ items: [{ text: "Review", status: "completed" }, { text: "Apply", status: "in_progress" }] });
 });
 
 test("compaction leaves a divider; the snapshot keeps the tail", () => {
@@ -81,7 +81,7 @@ test("compaction leaves a divider; the snapshot keeps the tail", () => {
   const snap = feed(lines).snapshot(4);
   expect(snap.hidden).toBe(7);
   expect(snap.items.map((i) => (i.kind === "user" ? i.text : i.kind))).toEqual(["m6", "m7", "m8", "m9"]);
-  expect(feed(lines).snapshot(100).items[0]).toMatchObject({ kind: "divider", text: "Conversación compactada" });
+  expect(feed(lines).snapshot(100).items[0]).toMatchObject({ kind: "divider", text: "Conversation compacted" });
 });
 
 test("sidechain (subagent) lines are skipped", () => {
@@ -145,13 +145,13 @@ test("background task notices are not user messages; pasted blocks are unwrapped
   const notice = "<task-notification>\n<task-id>b7</task-id>\n<status>failed</status>\n<summary>Background command \"Build\" failed with exit code 144</summary>\n</task-notification>";
   const t = feed([
     user(notice, { origin: { kind: "task-notification" } }),
-    user('mira esto\n\n<pasted_content id="ab12">\nlínea pegada\n</pasted_content id="ab12">'),
+    user('look at this\n\n<pasted_content id="ab12">\npasted line\n</pasted_content id="ab12">'),
     line({ type: "queue-operation", operation: "enqueue", uuid: "q", content: notice }),
   ]);
   const snap = t.snapshot(10);
   expect(snap.items).toMatchObject([
-    { kind: "divider", text: 'Tarea en segundo plano: Background command "Build" failed with exit code 144 (failed)' },
-    { kind: "user", text: "mira esto\n\nlínea pegada" },
+    { kind: "divider", text: 'Background task: Background command "Build" failed with exit code 144 (failed)' },
+    { kind: "user", text: "look at this\n\npasted line" },
   ]);
   expect(snap.queued).toEqual([]);
 });

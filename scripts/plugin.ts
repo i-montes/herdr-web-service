@@ -116,7 +116,7 @@ async function setup(): Promise<void> {
     } else {
       console.log(`\nError: ${(error as Error).message}`);
     }
-    if (process.stdin.isTTY) prompt("Pulsa Enter para cerrar.");
+    if (process.stdin.isTTY) prompt("Press Enter to close.");
     process.exit(error instanceof SetupAborted ? error.code : 1);
   }
 }
@@ -151,8 +151,8 @@ switch (verb) {
     await askAndSetPassword();
     break;
   case "tui-demo": { // hidden: exercised by tests/pty.py
-    const choice = await choose("Acceso:", [{ key: "local", label: "Solo local" }, { key: "lan", label: "Red local" }], "local");
-    console.log(`choice=${choice} confirm=${confirm("¿Seguir?", true)}`);
+    const choice = await choose("Access:", [{ key: "local", label: "Local only" }, { key: "lan", label: "Local network" }], "local");
+    console.log(`choice=${choice} confirm=${confirm("Continue?", true)}`);
     break;
   }
   case "url": console.log(config.publicUrl || origin); break;

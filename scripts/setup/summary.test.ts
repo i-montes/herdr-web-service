@@ -7,10 +7,10 @@ describe("renderSummary", () => {
   test("lan lists its limitations and no firewall hint", () => {
     const s = renderSummary({ ...base, mode: "lan", url: "http://192.168.1.20:7340" });
     expect(s).toContain("http://192.168.1.20:7340");
-    expect(s).toContain("sin push");
-    expect(s).toContain("sin passkeys");
+    expect(s).toContain("no push notifications");
+    expect(s).toContain("no passkeys");
     expect(s).not.toContain("ufw");
-    expect(s).toContain("Si cambia la IP de este equipo, vuelve a ejecutar la configuración.");
+    expect(s).toContain("If this machine's IP changes, run setup again.");
   });
   test("remote suggests the firewall and names the tunnel", () => {
     const s = renderSummary({ ...base, mode: "remote", url: "https://m.t.ts.net", tunnel: "tailscale" });

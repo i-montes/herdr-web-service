@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, type OpencodeOptions } from "./api.ts";
 import { Icon } from "./Home.tsx";
 
-const variantLabel = (v: string | null) => v ?? "predeterminado";
+const variantLabel = (v: string | null) => v ?? "default";
 
 /**
  * Desktop header: OpenCode's model and variant (its effort). Each opens a list; picking drives
@@ -44,7 +44,7 @@ export function OpencodeControls({ paneId, busy }: { paneId: string; busy: boole
     try {
       await change();
     } catch {
-      setError("OpenCode no aceptó el cambio");
+      setError("OpenCode rejected the change");
     } finally {
       await load();
       setWorking(false);
@@ -55,7 +55,7 @@ export function OpencodeControls({ paneId, busy }: { paneId: string; busy: boole
   if (!options || options.models.length === 0) return null;
   const current = options.models.find((m) => m.model === options.current.model);
   const disabled = busy || working;
-  const why = busy ? "Disponible cuando OpenCode esté listo" : working ? "Aplicando…" : undefined;
+  const why = busy ? "Available when OpenCode is ready" : working ? "Applying…" : undefined;
   const chevron = <Icon d="M6 9l6 6 6-6" size={14} width={2.2} className="text-muted" />;
   const button = "flex h-9 cursor-pointer items-center gap-1.5 px-3 text-[13px] font-semibold hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent";
   const item = "flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-sunken";
@@ -63,13 +63,13 @@ export function OpencodeControls({ paneId, busy }: { paneId: string; busy: boole
   return (
     <div ref={root} className="relative hidden shrink-0 lg:block">
       <div className="flex overflow-hidden rounded-full border border-line">
-        <button type="button" disabled={disabled} title={why ?? "Cambiar modelo"} aria-expanded={open === "model"} onClick={() => setOpen(open === "model" ? null : "model")} className={button}>
-          {working ? "Aplicando…" : (current?.name ?? options.current.model ?? "Modelo")}
+        <button type="button" disabled={disabled} title={why ?? "Change model"} aria-expanded={open === "model"} onClick={() => setOpen(open === "model" ? null : "model")} className={button}>
+          {working ? "Applying…" : (current?.name ?? options.current.model ?? "Model")}
           {chevron}
         </button>
         <span className="w-px bg-line" aria-hidden="true" />
-        <button type="button" disabled={disabled || options.variants.length < 2} title={why ?? "Cambiar variante"} aria-expanded={open === "variant"} onClick={() => setOpen(open === "variant" ? null : "variant")} className={button}>
-          <span className="font-normal text-muted">esfuerzo</span>
+        <button type="button" disabled={disabled || options.variants.length < 2} title={why ?? "Change variant"} aria-expanded={open === "variant"} onClick={() => setOpen(open === "variant" ? null : "variant")} className={button}>
+          <span className="font-normal text-muted">effort</span>
           {variantLabel(options.current.variant)}
           {chevron}
         </button>
@@ -99,7 +99,7 @@ export function OpencodeControls({ paneId, busy }: { paneId: string; busy: boole
                   </button>
                 );
               })}
-          {open === "model" && <p className="px-3 pt-1.5 pb-1 text-xs text-muted">Tus modelos recientes en OpenCode. Para otros, usa /models en la terminal.</p>}
+          {open === "model" && <p className="px-3 pt-1.5 pb-1 text-xs text-muted">Your recent OpenCode models. For others, use /models in the terminal.</p>}
         </div>
       )}
     </div>

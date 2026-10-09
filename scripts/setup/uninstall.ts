@@ -33,38 +33,38 @@ export async function runUninstall(d: UninstallDeps): Promise<boolean> {
   for (const port of new Set([envPort, d.port])) {
     if (!(env.TUNNEL === "tailscale" && port === envPort) && !(await d.funnelServes(port))) continue;
     if (await d.teardownTunnel("tailscale", port)) {
-      d.log(`apagado: Tailscale Funnel (puerto ${port})`);
+      d.log(`turned off: Tailscale Funnel (port ${port})`);
     } else if (!(await d.funnelServes(port))) {
-      d.log(`Tailscale Funnel: no estaba activo (puerto ${port})`);
+      d.log(`Tailscale Funnel: was not active (port ${port})`);
     } else {
       ok = false;
-      d.log(`NO se pudo apagar Tailscale Funnel: ejecuta \`tailscale funnel --bg ${port} off\``);
+      d.log(`FAILED to turn off Tailscale Funnel: run \`tailscale funnel --bg ${port} off\``);
     }
   }
 
-  const units: [Unit, string][] = [["tunnel", "servicio del túnel (Portal)"], ["server", "servicio del servidor"]];
+  const units: [Unit, string][] = [["tunnel", "tunnel service (Portal)"], ["server", "server service"]];
   for (const [unit, label] of units) {
     if (!d.unitInstalled(unit)) continue;
     await d.stopUnit(unit);
     await d.uninstallUnit(unit);
-    d.log(`quitado: ${label}`);
+    d.log(`removed: ${label}`);
   }
-  if (await d.stopLooseServer()) d.log("parado: servidor suelto");
+  if (await d.stopLooseServer()) d.log("stopped: standalone server");
 
   try {
     const r = d.removeStatusLine();
-    if (r.status === "removed") d.log("quitado: status line de Claude Code");
-    else if (r.status === "restored") d.log(`restaurada: status line de Claude Code (${r.previous})`);
+    if (r.status === "removed") d.log("removed: Claude Code status line");
+    else if (r.status === "restored") d.log(`restored: Claude Code status line (${r.previous})`);
     else if (r.status === "unreadable") {
       ok = false;
-      d.log(`NO se pudo quitar la status line de Claude Code: ${r.detail}`);
+      d.log(`FAILED to remove the Claude Code status line: ${r.detail}`);
     }
   } catch (error) {
     ok = false;
-    d.log(`NO se pudo quitar la status line de Claude Code: ${(error as Error).message}`);
+    d.log(`FAILED to remove the Claude Code status line: ${(error as Error).message}`);
   }
 
-  d.log(`conservado: contraseña (${d.authFile}) y configuración (${d.envPath})`);
-  d.log("Tailscale y Portal, si los usabas, siguen instalados.");
+  d.log(`kept: password (${d.authFile}) and configuration (${d.envPath})`);
+  d.log("Tailscale and Portal, if you used them, are still installed.");
   return ok;
 }

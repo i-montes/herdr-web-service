@@ -31,7 +31,7 @@ test("the reported session wins; otherwise the newest top-level session of the f
 test("messages, tools, plan, questions and compaction become chat items", () => {
   session("ses_1", "/Users/ana/p", 1);
   message("m1", "ses_1", { role: "user" });
-  part("p1", "m1", "ses_1", { type: "text", text: "Revisa el proyecto" });
+  part("p1", "m1", "ses_1", { type: "text", text: "Review the project" });
   part("p1s", "m1", "ses_1", { type: "text", text: "contexto interno", synthetic: true });
   message("m2", "ses_1", { role: "assistant", modelID: "MiniMax-M3", providerID: "minimax" });
   part("p2", "m2", "ses_1", { type: "step-start" });
@@ -40,7 +40,7 @@ test("messages, tools, plan, questions and compaction become chat items", () => 
   part("p5", "m2", "ses_1", { type: "tool", tool: "bash", state: { status: "completed", input: { command: "ls -la\necho fin" }, output: "a\nb" } });
   part("p6", "m2", "ses_1", { type: "tool", tool: "edit", state: { status: "error", input: { filePath: "/Users/ana/p/x.ts", oldString: "a", newString: "b\nc" }, error: "no match" } });
   part("p7", "m2", "ses_1", { type: "tool", tool: "todowrite", state: { status: "completed", input: { todos: [{ content: "Uno", status: "completed" }, { content: "Dos", status: "in_progress" }] } } });
-  part("p8", "m2", "ses_1", { type: "tool", tool: "question", state: { status: "running", input: { questions: [{ question: "¿Sigo?", options: [{ label: "Sí", description: "" }] }] } } });
+  part("p8", "m2", "ses_1", { type: "tool", tool: "question", state: { status: "running", input: { questions: [{ question: "Go on?", options: [{ label: "Yes", description: "" }] }] } } });
   part("p9", "m2", "ses_1", { type: "tool", tool: "read", state: { status: "pending", input: { filePath: "/Users/ana/p/y.ts" } } });
   part("p10", "m2", "ses_1", { type: "compaction", auto: true });
   part("p11", "m2", "ses_1", { type: "step-finish" });
@@ -48,11 +48,11 @@ test("messages, tools, plan, questions and compaction become chat items", () => 
   const chat = readOpencodeChat(db, "ses_1", "/Users/ana");
   expect(chat.model).toBe("MiniMax-M3");
   expect(chat.items.map((i) => i.kind)).toEqual(["user", "assistant", "tool", "tool", "plan", "question", "tool", "divider"]);
-  expect(chat.items[0]).toMatchObject({ kind: "user", text: "Revisa el proyecto" });
+  expect(chat.items[0]).toMatchObject({ kind: "user", text: "Review the project" });
   expect(chat.items[2]).toMatchObject({ kind: "tool", name: "Bash", summary: "ls -la", state: "done", output: "a\nb", detail: { type: "command", command: "ls -la\necho fin" } });
   expect(chat.items[3]).toMatchObject({ kind: "tool", name: "Edit", summary: "~/p/x.ts", state: "error", output: "no match", detail: { type: "diff", added: 2, removed: 1 } });
   expect(chat.items[4]).toMatchObject({ kind: "plan", items: [{ text: "Uno", status: "completed" }, { text: "Dos", status: "in_progress" }] });
-  expect(chat.items[5]).toMatchObject({ kind: "question", answer: null, questions: [{ question: "¿Sigo?" }] });
+  expect(chat.items[5]).toMatchObject({ kind: "question", answer: null, questions: [{ question: "Go on?" }] });
   expect(chat.items[6]).toMatchObject({ kind: "tool", name: "Read", summary: "~/p/y.ts", state: "running" });
 });
 

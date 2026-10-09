@@ -1,25 +1,25 @@
-/** What the Inicio screen shows, derived from Herdr's roster. Pure: no React, no DOM. */
+/** What the Home screen shows, derived from Herdr's roster. Pure: no React, no DOM. */
 import type { AgentStatus, Roster, RosterPane, RosterWorkspace } from "../../shared/protocol.ts";
 
-/** the four states the design draws; Herdr has no error state, so "Con error" is not offered */
+/** the four states the design draws; Herdr has no error state, so "With error" is not offered */
 export type Bucket = "waiting" | "working" | "idle";
 export type Filter = "all" | Bucket;
 
 export const BUCKET_OF: Record<AgentStatus, Bucket> = { blocked: "waiting", working: "working", done: "idle", idle: "idle", unknown: "idle" };
 
 export const STATUS_LABEL: Record<AgentStatus, string> = {
-  blocked: "Te espera",
-  working: "Trabajando",
-  done: "Terminó",
-  idle: "Inactiva",
-  unknown: "Inactiva",
+  blocked: "Needs you",
+  working: "Working",
+  done: "Done",
+  idle: "Idle",
+  unknown: "Idle",
 };
 
 export const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "Todas" },
-  { id: "waiting", label: "Te esperan" },
-  { id: "working", label: "Trabajando" },
-  { id: "idle", label: "Inactivas" },
+  { id: "all", label: "All" },
+  { id: "waiting", label: "Needs you" },
+  { id: "working", label: "Working" },
+  { id: "idle", label: "Idle" },
 ];
 
 export interface AgentLook {
@@ -51,14 +51,14 @@ export function sessionName(pane: RosterPane): string {
 export function ago(at: number | null, now: number): string | null {
   if (at === null) return null;
   const s = Math.max(0, Math.round((now - at) / 1000));
-  if (s < 10) return "ahora";
-  if (s < 60) return `hace ${s} s`;
+  if (s < 10) return "just now";
+  if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `hace ${m} min`;
+  if (m < 60) return `${m} min ago`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `hace ${h} h`;
+  if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
-  return d === 1 ? "ayer" : `hace ${d} días`;
+  return d === 1 ? "yesterday" : `${d} days ago`;
 }
 
 export interface WorkspaceGroup {

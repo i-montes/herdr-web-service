@@ -13,15 +13,15 @@ import { createPortal } from "react-dom";
 /** the special-keys bar under the terminal; `|` and `~` are typed as text */
 const KEYS: { label: string; aria: string; key?: PaneKey; text?: string }[] = [
   { label: "Esc", aria: "Escape", key: "esc" },
-  { label: "Tab", aria: "Tabulador", key: "tab" },
-  { label: "↑", aria: "Flecha arriba", key: "up" },
-  { label: "↓", aria: "Flecha abajo", key: "down" },
-  { label: "←", aria: "Flecha izquierda", key: "left" },
-  { label: "→", aria: "Flecha derecha", key: "right" },
+  { label: "Tab", aria: "Tab", key: "tab" },
+  { label: "↑", aria: "Up arrow", key: "up" },
+  { label: "↓", aria: "Down arrow", key: "down" },
+  { label: "←", aria: "Left arrow", key: "left" },
+  { label: "→", aria: "Right arrow", key: "right" },
   { label: "⏎", aria: "Enter", key: "enter" },
-  { label: "⌫", aria: "Borrar", key: "backspace" },
-  { label: "|", aria: "Barra vertical", text: "|" },
-  { label: "~", aria: "Virgulilla", text: "~" },
+  { label: "⌫", aria: "Backspace", key: "backspace" },
+  { label: "|", aria: "Pipe", text: "|" },
+  { label: "~", aria: "Tilde", text: "~" },
   { label: "^C", aria: "Control C", key: "ctrl+c" },
 ];
 
@@ -71,7 +71,7 @@ export function SessionView({ paneId, roster, loaded, access, onBack }: { paneId
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 flex items-center border-b border-line bg-surface px-[clamp(12px,3vw,32px)] py-2.5 lg:py-3">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 lg:gap-3.5">
-          <a href="#/" onClick={(e) => { e.preventDefault(); onBack(); }} aria-label="Volver a Inicio" className="flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-sunken lg:border lg:border-line">
+          <a href="#/" onClick={(e) => { e.preventDefault(); onBack(); }} aria-label="Back to Home" className="flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-sunken lg:border lg:border-line">
             <Icon d="M19 12H5M11 6l-6 6 6 6" size={18} width={2.2} />
           </a>
           <AgentTile agent={pane?.agent ?? null} className="size-9 rounded-[10px] font-mono text-base font-semibold" />
@@ -98,22 +98,22 @@ export function SessionView({ paneId, roster, loaded, access, onBack }: { paneId
       {ended ? (
         <main className="flex flex-1 flex-col p-4">
           <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-[18px] border-[1.5px] border-dashed border-line p-10 text-center">
-            <span className="text-xl font-bold">Esta sesión ya no está abierta</span>
+            <span className="text-xl font-bold">This session is no longer open</span>
             <button type="button" onClick={onBack} className="min-h-11 cursor-pointer rounded-full bg-accent px-5 text-[15px] font-semibold text-white">
-              Volver a Inicio
+              Back to Home
             </button>
           </div>
         </main>
       ) : hasChat && pane ? (
         // an agent with a chat is only a chat: its menus and prompts are answered from there
-        <Suspense fallback={<p className="py-16 text-center text-muted">Cargando conversación…</p>}>
+        <Suspense fallback={<p className="py-16 text-center text-muted">Loading conversation…</p>}>
           <ChatView key={pane.pane_id} pane={pane} onModel={setModel} onUsage={setUsage} onMenu={setMenuOpen} onGone={() => setGone(true)} />
         </Suspense>
       ) : (
         <main className="flex flex-1 flex-col gap-3 px-[clamp(12px,3vw,24px)] py-4">
           {pane?.agent && !hasChat && (
             <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
-              El chat de {look.label} llegará más adelante. Por ahora ves su terminal, y puedes escribirle desde aquí.
+              Chat for {look.label} is coming later. For now you see its terminal, and you can type into it from here.
             </p>
           )}
           <TerminalPanel paneId={paneId} onGone={() => setGone(true)} />
@@ -168,16 +168,16 @@ function ModelControls({ model, effort, busy, menuOpen, onCommand }: {
   const disabled = busy || sent || menuOpen;
   const chevron = <Icon d="M6 9l6 6 6-6" size={14} width={2.2} className="text-muted" />;
   const button = "flex h-9 cursor-pointer items-center gap-1.5 px-3 text-[13px] font-semibold hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent";
-  const why = busy ? "Disponible cuando Claude esté listo" : sent || menuOpen ? "Elige en el menú del chat" : undefined;
+  const why = busy ? "Available when Claude is ready" : sent || menuOpen ? "Pick from the menu in the chat" : undefined;
   return (
     <div className="hidden shrink-0 overflow-hidden rounded-full border border-line lg:flex">
-      <button type="button" disabled={disabled} title={why ?? "Cambiar modelo"} onClick={() => run("/model")} className={button}>
-        {model ?? "Modelo"}
+      <button type="button" disabled={disabled} title={why ?? "Change model"} onClick={() => run("/model")} className={button}>
+        {model ?? "Model"}
         {chevron}
       </button>
       <span className="w-px bg-line" aria-hidden="true" />
-      <button type="button" disabled={disabled} title={why ?? "Cambiar esfuerzo"} onClick={() => run("/effort")} className={button}>
-        <span className="font-normal text-muted">esfuerzo</span>
+      <button type="button" disabled={disabled} title={why ?? "Change effort"} onClick={() => run("/effort")} className={button}>
+        <span className="font-normal text-muted">effort</span>
         {effort ?? "—"}
         {chevron}
       </button>
@@ -209,7 +209,7 @@ function SessionMenu({ access, onClose }: { access: SessionInfo["access"]; onClo
     <div ref={root} className="relative shrink-0">
       <button
         type="button"
-        aria-label="Más acciones"
+        aria-label="More actions"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => {
@@ -236,14 +236,14 @@ function SessionMenu({ access, onClose }: { access: SessionInfo["access"]; onClo
             className={`${item} hidden lg:flex`}
           >
             <Icon d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM11 18h2" size={16} className="text-muted" />
-            Abrir en el móvil
+            Open on phone
           </button>
           {confirm ? (
             <div className="flex flex-col gap-2 p-2">
-              <span className="text-sm">¿Cerrar esta sesión? El proceso se detiene.</span>
+              <span className="text-sm">Close this session? The process will stop.</span>
               <div className="flex gap-2">
                 <button type="button" role="menuitem" onClick={onClose} className="min-h-10 flex-1 cursor-pointer rounded-full bg-danger text-sm font-semibold text-danger-ink">
-                  Sí, cerrar
+                  Yes, close
                 </button>
                 <button type="button" onClick={() => setConfirm(false)} className="min-h-10 flex-1 cursor-pointer rounded-full border border-line text-sm font-semibold">
                   No
@@ -253,7 +253,7 @@ function SessionMenu({ access, onClose }: { access: SessionInfo["access"]; onClo
           ) : (
             <button type="button" role="menuitem" onClick={() => setConfirm(true)} className={`${item} text-danger-ink`}>
               <Icon d="M6 6l12 12M18 6L6 18" size={16} />
-              Cerrar sesión
+              Close session
             </button>
           )}
         </div>
@@ -330,7 +330,7 @@ export function TerminalPanel({ paneId, onGone }: { paneId: string; onGone: () =
       setTimeout(() => refreshNow.current(), 120);
     } catch (e) {
       if (e instanceof ApiFailure && e.status === 404) gone.current();
-      else setSendError("No se pudo enviar. ¿Sigue abierta la sesión?");
+      else setSendError("Couldn't send. Is the session still open?");
     }
   };
 
@@ -355,7 +355,7 @@ export function TerminalPanel({ paneId, onGone }: { paneId: string; onGone: () =
         style={{ maxHeight: "calc(100dvh - 260px)", fontSize: `${fit.fontPx}px` }}
       >
         {screen === null ? (
-          <span className="text-term-muted">Conectando…</span>
+          <span className="text-term-muted">Connecting…</span>
         ) : (
           // one block per line; rules become a full-width line instead of wrapping characters
           lines.map((line, i) =>
@@ -366,26 +366,26 @@ export function TerminalPanel({ paneId, onGone }: { paneId: string; onGone: () =
 
       <form onSubmit={submitLine} className="flex items-center gap-2 rounded-[14px] border border-term-line bg-term pr-1.5">
         <span className="pl-4 font-mono text-[15px] text-term-prompt">›</span>
-        <label htmlFor="sv-line" className="sr-only">Escribir en la sesión</label>
+        <label htmlFor="sv-line" className="sr-only">Type into the session</label>
         <input
           id="sv-line"
           type="text"
           value={line}
           onChange={(e) => setLine(e.target.value)}
-          placeholder="Escribe y pulsa Enter"
+          placeholder="Type and press Enter"
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
           className="h-12 min-w-0 flex-1 bg-transparent font-mono text-base text-term-ink outline-none placeholder:text-term-muted lg:text-[15px]"
         />
-        <button type="submit" aria-label="Enviar" className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-white">
+        <button type="submit" aria-label="Send" className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-white">
           <Icon d="M12 19V5M5 12l7-7 7 7" size={18} width={2.2} />
         </button>
       </form>
 
       {sendError && <p role="alert" className="text-sm text-danger-ink">{sendError}</p>}
 
-      <div role="toolbar" aria-label="Teclas especiales" className="flex flex-wrap gap-2">
+      <div role="toolbar" aria-label="Special keys" className="flex flex-wrap gap-2">
         {KEYS.map((k) => (
           <button
             key={k.label}

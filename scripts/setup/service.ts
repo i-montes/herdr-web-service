@@ -150,8 +150,8 @@ const domain = () => `gui/${process.getuid?.() ?? 0}`;
 async function ensureLinger(run: Run): Promise<void> {
   const user = process.env.USER ?? "";
   if ((await run(["loginctl", "enable-linger", user])) === 0) return;
-  console.log("No pude activar 'linger', así que el servicio solo arrancará cuando inicies sesión.");
-  console.log("Para que arranque con el sistema, ejecuta una vez:");
+  console.log("Could not enable 'linger', so the service will only start when you log in.");
+  console.log("To have it start at boot, run once:");
   console.log(`  sudo loginctl enable-linger ${user}`);
 }
 

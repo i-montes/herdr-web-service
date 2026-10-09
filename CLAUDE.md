@@ -55,7 +55,7 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
     `usage.ts`: contexto y límites del plan (5 h y semana, con su reinicio) de Claude Code. Los
     entrega a su status line: `scripts/statusline.ts` (lo registra `setup` en `settings.json` →
     `statusLine` de Claude Code) los guarda en `<state dir>/claude-status/<session_id>.json` y pinta
-    `ctx 62% · 5h 34% · sem 12%` al pie de la terminal. Si ya había otra status line, `setup` la
+    `ctx 62% · 5h 34% · wk 12%` al pie de la terminal. Si ya había otra status line, `setup` la
     guarda en `<config dir>/claude-statusline.json` y la encadena (se ejecuta con la misma entrada y
     su salida va delante); `uninstall` la restaura.
     `opencode-controls.ts`: modelo y variante (esfuerzo) de OpenCode y su uso (contexto % con el
@@ -66,7 +66,7 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   - `uploads.ts` — imágenes del chat (`POST /api/uploads`, `GET /api/uploads/<nombre>`): solo PNG,
     JPEG, GIF y WebP reconocidos por sus bytes, hasta 10 MB, nombre aleatorio, en
     `<tmpdir>/herdr-web-uploads` (el sistema la limpia; el servidor borra lo de más de 7 días).
-    El mensaje lleva `[imagen: <ruta>]` y el agente la lee; Claude arranca con `--add-dir` de esa
+    El mensaje lleva `[image: <ruta>]` y el agente la lee; Claude arranca con `--add-dir` de esa
     carpeta para no pedir permiso.
   - `herdr/panes.ts` — vista de terminal: `GET /api/panes/:id/screen`, `POST …/input` (texto y
     teclas de una lista blanca), `POST …/close`.
@@ -76,7 +76,7 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   "Herdr Web — Sistema visual": colores como variables en `index.css` (utilidades `bg-canvas`,
   `text-ink`…; claro/oscuro por sistema o `data-theme`, ver `theme.ts`), fuentes servidas en local.
   Pantallas: `Login.tsx`, `Home.tsx` (Inicio), `NewSession.tsx` (diálogo), `SessionView.tsx`
-  (terminal). Rutas por hash: `#/` y `#/sesion/<pane>`.
+  (terminal). Rutas por hash: `#/` y `#/session/<pane>` (acepta también el antiguo `#/sesion/`).
   PWA: `web/public/` (manifiesto, `sw.js` que nunca cachea `/api` ni `/ws`, iconos). El service
   worker solo se registra en HTTPS o localhost. `OpenOnPhone.tsx`: QR "Abrir en el móvil", solo
   en escritorio, con la URL de `PUBLIC_URL` (en modo local explica que el móvil no llega).
@@ -131,4 +131,4 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   ya trae el estado).
 - Llamadas a Herdr: socket directo para request/response y suscripciones; `HERDR_BIN_PATH` para
   comandos que el CLI envuelve mejor (attach de terminal).
-- Textos de UI en español; código y comentarios en inglés.
+- Textos de UI (web, asistente, CLI) en inglés; código y comentarios también en inglés.

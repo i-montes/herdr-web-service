@@ -1,5 +1,5 @@
 /**
- * Folder picker for "Nueva sesión": lists the subfolders of a folder inside the user's home.
+ * Folder picker for "New session": lists the subfolders of a folder inside the user's home.
  * Paths travel as `~/…`; anything that resolves outside home (through `..` or a symlink) is
  * refused, so a signed-in browser can browse projects without seeing the rest of the machine.
  */

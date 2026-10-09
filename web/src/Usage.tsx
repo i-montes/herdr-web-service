@@ -9,26 +9,26 @@ function tone(percent: number): { bar: string; text: string } {
   return { bar: "bg-ok-dot", text: "text-ink" };
 }
 
-/** "en 2 h 13 min", or the weekday and hour when it is days away */
+/** "in 2 h 13 min", or the weekday and hour when it is days away */
 export function resetsIn(at: number, now: number): string {
   const minutes = Math.max(0, Math.round((at - now) / 60_000));
-  if (minutes < 60) return `en ${minutes} min`;
+  if (minutes < 60) return `in ${minutes} min`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `en ${hours} h ${minutes % 60} min`;
+  if (hours < 24) return `in ${hours} h ${minutes % 60} min`;
   const date = new Date(at);
-  const day = date.toLocaleDateString("es", { weekday: "long" });
-  const time = date.toLocaleTimeString("es", { hour: "numeric", minute: "2-digit" });
-  return `el ${day} a las ${time}`;
+  const day = date.toLocaleDateString("en", { weekday: "long" });
+  const time = date.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
+  return `on ${day} at ${time}`;
 }
 
-const tokens = (n: number) => n.toLocaleString("es");
+const tokens = (n: number) => n.toLocaleString("en");
 
 /** header pill with the context ring; opens the details */
 export function UsageButton({ usage }: { usage: AgentUsage }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const shown = usage.context?.percent ?? usage.fiveHour?.percent ?? 0;
-  const label = usage.context ? `Contexto ${Math.round(usage.context.percent)}%` : `Uso ${Math.round(shown)}%`;
+  const label = usage.context ? `Context ${Math.round(usage.context.percent)}%` : `Usage ${Math.round(shown)}%`;
 
   useEffect(() => {
     if (!open) return;
@@ -51,7 +51,7 @@ export function UsageButton({ usage }: { usage: AgentUsage }) {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-label={`${label}. Ver uso`}
+        aria-label={`${label}. Show usage`}
         className="flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-line px-2.5 text-[13px] font-semibold hover:bg-sunken"
       >
         <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" className="-rotate-90">
@@ -69,25 +69,25 @@ function UsagePanel({ usage }: { usage: AgentUsage }) {
   const now = Date.now();
   return (
     // phones: pinned under the header across the screen, wherever the pill sits; desktop: under the pill
-    <div role="dialog" aria-label="Uso" className="fixed inset-x-3 top-[68px] z-30 flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 shadow-dialog lg:absolute lg:inset-x-auto lg:top-11 lg:right-0 lg:w-[320px]">
+    <div role="dialog" aria-label="Usage" className="fixed inset-x-3 top-[68px] z-30 flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 shadow-dialog lg:absolute lg:inset-x-auto lg:top-11 lg:right-0 lg:w-[320px]">
       {usage.context && (
-        <Meter title="Contexto" percent={usage.context.percent} detail={`${tokens(usage.context.used)} de ${tokens(usage.context.size)} tokens`} />
+        <Meter title="Context" percent={usage.context.percent} detail={`${tokens(usage.context.used)} of ${tokens(usage.context.size)} tokens`} />
       )}
-      {usage.fiveHour && <LimitMeter title="Sesión (5 horas)" window={usage.fiveHour} now={now} />}
-      {usage.week && <LimitMeter title="Semana" window={usage.week} now={now} />}
+      {usage.fiveHour && <LimitMeter title="Session (5 hours)" window={usage.fiveHour} now={now} />}
+      {usage.week && <LimitMeter title="Week" window={usage.week} now={now} />}
       {usage.weekCostUsd !== undefined ? (
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-sm font-semibold">Gasto (últimos 7 días)</span>
+          <span className="text-sm font-semibold">Spend (last 7 days)</span>
           <span className="font-mono text-sm font-semibold">${usage.weekCostUsd.toFixed(2)}</span>
         </div>
       ) : (
-        !usage.fiveHour && !usage.week && <p className="text-[13px] text-muted">Tu plan no informa límites de uso.</p>
+        !usage.fiveHour && !usage.week && <p className="text-[13px] text-muted">Your plan doesn't report usage limits.</p>
       )}
       <div className="flex flex-wrap gap-x-2 gap-y-1 border-t border-line pt-3 text-xs text-muted">
-        {[usage.model, usage.effort && `esfuerzo ${usage.effort}`, usage.costUsd !== null && (usage.weekCostUsd !== undefined ? `$${usage.costUsd.toFixed(2)} en esta sesión` : `≈ $${usage.costUsd.toFixed(2)} en precio de API`)].filter(Boolean).join(" · ")}
+        {[usage.model, usage.effort && `effort ${usage.effort}`, usage.costUsd !== null && (usage.weekCostUsd !== undefined ? `$${usage.costUsd.toFixed(2)} this session` : `≈ $${usage.costUsd.toFixed(2)} at API prices`)].filter(Boolean).join(" · ")}
         {usage.updatedAt > 0 && (
           <span>
-            · actualizado <Ago at={usage.updatedAt} />
+            · updated <Ago at={usage.updatedAt} />
           </span>
         )}
       </div>
@@ -96,7 +96,7 @@ function UsagePanel({ usage }: { usage: AgentUsage }) {
 }
 
 function LimitMeter({ title, window: w, now }: { title: string; window: UsageWindow; now: number }) {
-  return <Meter title={title} percent={w.percent} detail={w.resetsAt ? `Se reinicia ${resetsIn(w.resetsAt, now)}` : null} />;
+  return <Meter title={title} percent={w.percent} detail={w.resetsAt ? `Resets ${resetsIn(w.resetsAt, now)}` : null} />;
 }
 
 function Meter({ title, percent, detail }: { title: string; percent: number; detail: string | null }) {

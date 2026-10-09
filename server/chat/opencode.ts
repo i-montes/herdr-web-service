@@ -185,7 +185,7 @@ export function readOpencodeChat(db: Database, sessionId: string, home: string):
       } else if (type === "tool") {
         items.push(toolItem(p.id, str(p.data["tool"]), (p.data["state"] ?? {}) as Raw, home));
       } else if (type === "compaction") {
-        items.push({ kind: "divider", id: p.id, text: "Conversación compactada" });
+        items.push({ kind: "divider", id: p.id, text: "Conversation compacted" });
       }
     }
   }

@@ -9,7 +9,7 @@ import { sessionHref } from "./roster.ts";
 import { FILTERS, STATUS_LABEL, BUCKET_OF, agentLook, homeView, plural, sessionName, type Filter, type WorkspaceGroup } from "./home.ts";
 import { useTheme } from "./theme.ts";
 
-/** chip and dot classes per status (design: espera / trabajando / inactiva) */
+/** chip and dot classes per status (design: waiting / working / idle) */
 const STATUS_LOOK = {
   waiting: { dot: "bg-accent-ink", chip: "bg-accent-soft text-accent-soft-ink" },
   working: { dot: "bg-ok-dot", chip: "bg-ok text-ok-ink" },
@@ -26,11 +26,11 @@ function accessLook(session: SessionInfo): { label: string; short: string; host:
   } catch {
     /* a junk PUBLIC_URL: show where the page was opened */
   }
-  if (session.herdr?.connected === false) return { label: "Herdr no responde", short: "Sin Herdr", host, ok: false };
+  if (session.herdr?.connected === false) return { label: "Herdr not responding", short: "No Herdr", host, ok: false };
   switch (session.access?.mode) {
-    case "remote": return { label: "Acceso remoto", short: "Remoto", host, ok: true };
-    case "lan": return { label: "Red local", short: "Red local", host, ok: true };
-    default: return { label: "Solo este equipo", short: "Local", host, ok: true };
+    case "remote": return { label: "Remote access", short: "Remote", host, ok: true };
+    case "lan": return { label: "Local network", short: "LAN", host, ok: true };
+    default: return { label: "This computer only", short: "Local", host, ok: true };
   }
 }
 
@@ -66,8 +66,8 @@ export function Home({ session, roster, connected, live, onLogout, onCreated }: 
   const access = accessLook({ ...session, herdr: { connected } });
   const showWaiting = view.waiting.length > 0 && (filter === "all" || filter === "waiting") && !query.trim();
   const shownGroups = view.groups.filter((g) => g.shown.length > 0);
-  const filterLabel = filter === "all" ? "todas las sesiones" : FILTERS.find((f) => f.id === filter)!.label.toLowerCase();
-  const themeLabel = theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+  const filterLabel = filter === "all" ? "all sessions" : FILTERS.find((f) => f.id === filter)!.label.toLowerCase();
+  const themeLabel = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
 
   return (
     <div className="min-h-dvh lg:flex">
@@ -83,10 +83,10 @@ export function Home({ session, roster, connected, live, onLogout, onCreated }: 
       {/* mobile drawer */}
       {drawer && (
         <div className="fixed inset-0 z-30 flex lg:hidden">
-          <aside aria-label="Menú" className="relative z-10 flex w-[312px] max-w-[85vw] flex-col gap-4.5 overflow-y-auto border-r border-line bg-surface px-3.5 pt-3 pb-6 shadow-drawer">
+          <aside aria-label="Menu" className="relative z-10 flex w-[312px] max-w-[85vw] flex-col gap-4.5 overflow-y-auto border-r border-line bg-surface px-3.5 pt-3 pb-6 shadow-drawer">
             <div className="flex min-h-11 items-center gap-2 pl-1.5">
               <Brand size="text-2xl" />
-              <button type="button" onClick={() => setDrawer(false)} aria-label="Cerrar menú" className="ml-auto flex size-11 cursor-pointer items-center justify-center rounded-full border border-line">
+              <button type="button" onClick={() => setDrawer(false)} aria-label="Close menu" className="ml-auto flex size-11 cursor-pointer items-center justify-center rounded-full border border-line">
                 <Icon d="M6 6l12 12M18 6L6 18" size={18} width={2.2} />
               </button>
             </div>
@@ -105,14 +105,14 @@ export function Home({ session, roster, connected, live, onLogout, onCreated }: 
               }
             />
           </aside>
-          <button type="button" aria-label="Cerrar menú" onClick={() => setDrawer(false)} className="flex-1 cursor-pointer bg-scrim" />
+          <button type="button" aria-label="Close menu" onClick={() => setDrawer(false)} className="flex-1 cursor-pointer bg-scrim" />
         </div>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* mobile header */}
         <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-line bg-canvas py-3 pr-4 pl-2 lg:hidden">
-          <button type="button" onClick={() => setDrawer(true)} aria-label="Abrir menú" aria-expanded={drawer} className="relative flex size-11 cursor-pointer items-center justify-center rounded-full">
+          <button type="button" onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer} className="relative flex size-11 cursor-pointer items-center justify-center rounded-full">
             <Icon d="M4 7h16M4 12h16M4 17h10" size={22} width={2.2} />
             {view.waiting.length > 0 && <span className="absolute top-[9px] right-[7px] size-[9px] rounded-full border-2 border-canvas bg-accent-ink" />}
           </button>
@@ -127,26 +127,26 @@ export function Home({ session, roster, connected, live, onLogout, onCreated }: 
         <main className="flex flex-1 flex-col gap-6 px-4 pt-5 pb-8 lg:gap-9 lg:p-[clamp(24px,4vw,48px)]">
           <header className="flex flex-wrap items-end justify-between gap-5">
             <div className="flex flex-col gap-1 lg:gap-1.5">
-              <h1 className="text-[40px] leading-none font-extrabold tracking-[-0.04em] lg:text-[clamp(36px,4vw,52px)]">Inicio</h1>
+              <h1 className="text-[40px] leading-none font-extrabold tracking-[-0.04em] lg:text-[clamp(36px,4vw,52px)]">Home</h1>
               <p className="text-[15px] text-muted lg:text-base">
-                {plural(view.groups.length, "workspace", "workspaces")} · {plural(view.sessions, "sesión abierta", "sesiones abiertas")}
+                {plural(view.groups.length, "workspace", "workspaces")} · {plural(view.sessions, "open session", "open sessions")}
               </p>
             </div>
             <div className="relative flex w-full items-center lg:w-auto lg:min-w-[220px] lg:flex-[0_1_320px]">
-              <label htmlFor="herdr-q" className="sr-only">Buscar sesiones</label>
+              <label htmlFor="herdr-q" className="sr-only">Search sessions</label>
               <Icon d="M20 20l-3.5-3.5" circle={[11, 11, 7]} size={18} className="pointer-events-none absolute left-3.5 text-muted" />
               <input
                 id="herdr-q"
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar sesión o workspace"
+                placeholder="Search sessions or workspaces"
                 className="h-12 w-full rounded-full border border-line bg-surface pr-4 pl-[42px] text-base text-ink outline-none placeholder:text-muted focus:border-accent-ink focus:shadow-[0_0_0_4px_var(--color-focus)] lg:h-11 lg:text-[15px]"
               />
             </div>
           </header>
 
-          <div role="group" aria-label="Filtrar por estado" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0">
+          <div role="group" aria-label="Filter by status" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0">
             {FILTERS.map((f) => {
               const selected = f.id === filter;
               return (
@@ -169,19 +169,19 @@ export function Home({ session, roster, connected, live, onLogout, onCreated }: 
 
           {!live && (
             <p role="status" className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm text-muted">
-              Sin conexión con el servidor. Reconectando…
+              Lost connection to the server. Reconnecting…
             </p>
           )}
 
           {live && !connected && (
             <p role="status" className="rounded-2xl border border-danger-line px-4 py-3 text-sm text-danger-ink">
-              Herdr no responde. La lista se actualizará cuando vuelva.
+              Herdr isn't responding. The list will update when it's back.
             </p>
           )}
 
           {showWaiting && (
             <section className="flex flex-col gap-3 lg:gap-3.5">
-              <SectionTitle title="Te esperan" meta={String(view.waiting.length)} />
+              <SectionTitle title="Needs you" meta={String(view.waiting.length)} />
               <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))]">
                 {view.waiting.map((p) => (
                   <WaitingCard key={p.pane_id} pane={p} workspace={roster.workspaces.find((w) => w.workspace_id === p.workspace_id)?.label ?? ""} />
@@ -194,7 +194,7 @@ export function Home({ session, roster, connected, live, onLogout, onCreated }: 
             <SectionTitle title="Workspaces" meta={filterLabel} />
             {shownGroups.length === 0 && (
               <div className="rounded-[18px] border-[1.5px] border-dashed border-line px-4 py-7 text-center text-[15px] text-muted lg:p-8">
-                {view.sessions === 0 ? "No hay sesiones abiertas en Herdr." : "Ninguna sesión coincide con este filtro."}
+                {view.sessions === 0 ? "No open sessions in Herdr." : "No sessions match this filter."}
               </div>
             )}
             <div className="grid items-start gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr))]">
@@ -251,11 +251,11 @@ function SidebarBody({ groups, access, onLogout, onNew, mobile, onHome, themeTog
         {mobile && (
           <button type="button" onClick={onHome} aria-current="page" className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[10px] bg-sunken px-2.5 text-left text-[15px] font-semibold">
             <Icon d="M3 11l9-7 9 7M5 10v10h14V10" size={18} />
-            Inicio
+            Home
           </button>
         )}
         <div className={`px-2 font-mono text-[11px] tracking-[0.12em] text-muted uppercase ${mobile ? "pt-3.5 pb-1.5" : "pt-1 pb-1.5"}`}>Workspaces</div>
-        {groups.length === 0 && <p className="px-2 text-sm text-muted">Sin workspaces.</p>}
+        {groups.length === 0 && <p className="px-2 text-sm text-muted">No workspaces.</p>}
         {groups.map((g) => {
           const id = g.workspace.workspace_id;
           const expanded = !collapsed[id];
@@ -318,7 +318,7 @@ function WaitingCard({ pane, workspace }: { pane: RosterPane; workspace: string 
       <div className="flex items-center justify-between gap-3">
         <Ago at={pane.changed_at} className="text-[13px] text-muted" fallback={<span className="text-[13px] text-muted">{pane.cwd}</span>} />
         <a href={sessionHref(pane.pane_id)} className="flex min-h-11 items-center gap-1.5 rounded-full bg-accent px-[18px] text-[15px] font-semibold text-white lg:min-h-10 lg:text-sm">
-          Abrir
+          Open
           <Icon d="M5 12h14M13 6l6 6-6 6" size={14} width={2.4} />
         </a>
       </div>
@@ -349,7 +349,7 @@ function WorkspaceCard({ group, onNew }: { group: WorkspaceGroup; onNew: () => v
           <span className="font-mono text-xs text-muted lg:hidden">{shown.length}</span>
           <Chevron open={open} size={16} className="lg:hidden" />
         </button>
-        <button type="button" onClick={onNew} aria-label={`Nueva sesión en ${workspace.label}`} className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line hover:bg-sunken lg:size-10">
+        <button type="button" onClick={onNew} aria-label={`New session in ${workspace.label}`} className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line hover:bg-sunken lg:size-10">
           <Icon d="M12 5v14M5 12h14" size={16} width={2.2} />
         </button>
       </div>
@@ -404,7 +404,7 @@ function NewSession({ className, onClick }: { className: string; onClick: () => 
   return (
     <button type="button" onClick={onClick} className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-accent font-semibold text-white ${className}`}>
       <Icon d="M12 5v14M5 12h14" size={16} width={2.2} />
-      Nueva sesión
+      New session
     </button>
   );
 }
@@ -413,7 +413,7 @@ function LogoutButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted hover:text-ink lg:min-h-10">
       <Icon d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" size={16} />
-      Cerrar sesión
+      Sign out
     </button>
   );
 }

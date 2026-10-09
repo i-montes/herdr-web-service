@@ -61,6 +61,6 @@ describe("verifyHealth", () => {
   test("public DNS does not know it either: still the DNS failure", async () => {
     const r = await verifyHealth(`http://herdr-test.invalid:${ok.port}`, 600, { resolvePublic: async () => [] });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toContain("resolver");
+    if (!r.ok) expect(r.reason).toContain("could not resolve");
   });
 });

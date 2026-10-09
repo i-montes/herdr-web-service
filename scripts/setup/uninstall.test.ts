@@ -47,7 +47,7 @@ test("no TUNNEL in .env but Funnel serves our port: turned off, before the units
   const h = harness({ env: "ACCESS_MODE=local\n", units: ["server"], serving: [7340] });
   expect(await runUninstall(h.deps)).toBe(true);
   expect(h.calls).toEqual(["teardown:tailscale:7340", "stop:server", "uninstall:server", "stopLoose"]);
-  expect(h.output()).toContain("apagado: Tailscale Funnel");
+  expect(h.output()).toContain("turned off: Tailscale Funnel");
 });
 
 test("TUNNEL=tailscale is turned off even if status cannot tell", async () => {
@@ -59,32 +59,32 @@ test("TUNNEL=tailscale is turned off even if status cannot tell", async () => {
 test("a failed Funnel off is reported, not hidden", async () => {
   const h = harness({ env: "TUNNEL=tailscale\n", serving: [7340], teardownOk: false });
   expect(await runUninstall(h.deps)).toBe(false);
-  expect(h.output()).not.toContain("apagado: Tailscale Funnel");
+  expect(h.output()).not.toContain("turned off: Tailscale Funnel");
   expect(h.output()).toContain("tailscale funnel --bg 7340 off");
 });
 
 test("TUNNEL=tailscale with tailscale gone: says it was not active", async () => {
   const h = harness({ env: "TUNNEL=tailscale\n", teardownOk: false });
   expect(await runUninstall(h.deps)).toBe(true);
-  expect(h.output()).toContain("no estaba activo");
+  expect(h.output()).toContain("was not active");
 });
 
 test("nothing configured: no teardown, units removed, kept files listed", async () => {
   const h = harness({ units: ["server", "tunnel"], loose: true });
   expect(await runUninstall(h.deps)).toBe(true);
   expect(h.calls).toEqual(["stop:tunnel", "uninstall:tunnel", "stop:server", "uninstall:server", "stopLoose"]);
-  expect(h.output()).toContain("conservado:");
-  expect(h.output()).toContain("servidor suelto");
+  expect(h.output()).toContain("kept:");
+  expect(h.output()).toContain("standalone server");
 });
 
 test("our status line is taken out; a chained one is put back", async () => {
   const removed = harness({ statusLine: () => ({ status: "removed" }) });
   expect(await runUninstall(removed.deps)).toBe(true);
-  expect(removed.output()).toContain("quitado: status line de Claude Code");
+  expect(removed.output()).toContain("removed: Claude Code status line");
 
   const restored = harness({ statusLine: () => ({ status: "restored", previous: "~/bin/line.sh" }) });
   await runUninstall(restored.deps);
-  expect(restored.output()).toContain("restaurada: status line de Claude Code (~/bin/line.sh)");
+  expect(restored.output()).toContain("restored: Claude Code status line (~/bin/line.sh)");
 });
 
 test("a status line problem does not stop the uninstall", async () => {

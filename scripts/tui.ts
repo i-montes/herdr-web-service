@@ -83,7 +83,7 @@ export async function readSecret(label: string, options: SecretOptions = {}): Pr
     }
     if (key === "\r" || key === "\n") {
       if (!options.rules || passwordRules(value).every((rule) => rule.ok)) return true;
-      hint = "faltan reglas por cumplir";
+      hint = "some rules are not met yet";
       render();
       return false;
     }
@@ -106,13 +106,13 @@ export function ask(label: string): string {
   return prompt(label) ?? "";
 }
 
-const YES = new Set(["s", "si", "sí", "y", "yes"]);
+const YES = new Set(["y", "yes"]);
 const NO = new Set(["n", "no"]);
 
 /** A yes/no question; Enter takes the default and anything unrecognised asks again. */
 export function confirm(label: string, defaultYes: boolean): boolean {
   if (!process.stdin.isTTY) return defaultYes;
-  const hint = defaultYes ? "[S/n]" : "[s/N]";
+  const hint = defaultYes ? "[Y/n]" : "[y/N]";
   for (;;) {
     const answer = (prompt(`${label} ${hint}`) ?? "").trim().toLowerCase();
     if (!answer) return defaultYes;
@@ -148,7 +148,7 @@ export function readLine(label: string): Promise<string> {
 /** `confirm` that leaves signal listeners able to run while it waits (see `readLine`). */
 export async function confirmAsync(label: string, defaultYes: boolean): Promise<boolean> {
   if (!process.stdin.isTTY) return defaultYes;
-  const hint = defaultYes ? "[S/n]" : "[s/N]";
+  const hint = defaultYes ? "[Y/n]" : "[y/N]";
   for (;;) {
     const answer = (await readLine(`${label} ${hint}`)).trim().toLowerCase();
     if (!answer) return defaultYes;
@@ -170,7 +170,7 @@ export async function choose(label: string, options: { key: string; label: strin
   const out = process.stdout;
   out.write(`${label}\n`);
   options.forEach((option, i) => {
-    const mark = option === fallback ? `  ${DIM}(por defecto)${RESET}` : "";
+    const mark = option === fallback ? `  ${DIM}(default)${RESET}` : "";
     out.write(`  ${i + 1}) ${option.label}${mark}\n`);
   });
   let picked: { key: string; label: string } | undefined;

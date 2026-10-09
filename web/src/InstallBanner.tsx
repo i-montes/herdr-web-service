@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Icon } from "./Home.tsx";
 import { useInstallOffer } from "./install.ts";
 
-/** "Instala Herdr": the native install dialog where the browser allows it, instructions on iOS */
+/** "Install Herdr": the native install dialog where the browser allows it, instructions on iOS */
 export function InstallBanner() {
   const { offer, dismiss } = useInstallOffer();
   const [busy, setBusy] = useState(false);
@@ -17,19 +17,19 @@ export function InstallBanner() {
       <div className="flex items-start gap-3">
         <img src="/icon-192.png" alt="" width={44} height={44} className="size-11 shrink-0 rounded-xl" />
         <div className="flex min-w-0 flex-col gap-1">
-          <h2 id="install-title" className="text-[17px] font-bold">Instala Herdr</h2>
+          <h2 id="install-title" className="text-[17px] font-bold">Install Herdr</h2>
           {offer.kind === "native" ? (
-            <p className="text-sm text-muted">Ábrela como una app desde tu pantalla de inicio o tu escritorio, sin la barra del navegador.</p>
+            <p className="text-sm text-muted">Open it as an app from your home screen or desktop, without the browser bar.</p>
           ) : (
             <p className="text-sm text-muted">
-              En Safari toca <Icon d="M12 3v12M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" size={15} className="inline-block align-[-2px] text-accent-ink" /> Compartir y luego «Añadir a pantalla de inicio».
+              In Safari, tap <Icon d="M12 3v12M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" size={15} className="inline-block align-[-2px] text-accent-ink" /> Share, then “Add to Home Screen”.
             </p>
           )}
         </div>
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={dismiss} className="min-h-10 cursor-pointer rounded-full px-4 text-sm font-semibold text-muted hover:text-ink">
-          {offer.kind === "native" ? "Ahora no" : "Entendido"}
+          {offer.kind === "native" ? "Not now" : "Got it"}
         </button>
         {offer.kind === "native" && (
           <button
@@ -45,7 +45,7 @@ export function InstallBanner() {
             }}
             className="min-h-10 cursor-pointer rounded-full bg-accent px-5 text-sm font-semibold text-white disabled:opacity-70"
           >
-            Instalar
+            Install
           </button>
         )}
       </div>

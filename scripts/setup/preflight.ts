@@ -34,17 +34,17 @@ export async function preflight(): Promise<PreflightResult> {
   const herdrBin = process.env["HERDR_BIN_PATH"] || "herdr";
   const version = spawnSync(herdrBin, ["--version"], { encoding: "utf8" });
   if (version.error || version.status !== 0) {
-    problems.push(`No se encontró el binario de Herdr (${herdrBin}): instala Herdr o define HERDR_BIN_PATH`);
+    problems.push(`Herdr binary not found (${herdrBin}): install Herdr or set HERDR_BIN_PATH`);
   } else if (!versionAtLeast(version.stdout, "0.9.0")) {
-    problems.push(`Herdr ${version.stdout.trim()} es demasiado antiguo: se necesita 0.9.0 o superior, actualiza Herdr`);
+    problems.push(`Herdr ${version.stdout.trim()} is too old: 0.9.0 or later is required, update Herdr`);
   }
 
   if (!versionAtLeast(Bun.version, "1.3.0")) {
-    problems.push(`Bun ${Bun.version} es demasiado antiguo: se necesita 1.3.0 o superior, ejecuta \`bun upgrade\``);
+    problems.push(`Bun ${Bun.version} is too old: 1.3.0 or later is required, run \`bun upgrade\``);
   }
 
   if (!existsSync(join(ROOT, "dist", "index.html"))) {
-    problems.push("Falta dist/: ejecuta `bun run build`");
+    problems.push("dist/ is missing: run `bun run build`");
   }
 
   const client = new HerdrClient(config.herdrSocket);
@@ -54,7 +54,7 @@ export async function preflight(): Promise<PreflightResult> {
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2000)),
     ]);
   } catch {
-    problems.push(`Herdr no responde en ${config.herdrSocket}: abre Herdr (o revisa HERDR_SOCKET_PATH)`);
+    problems.push(`Herdr is not responding at ${config.herdrSocket}: open Herdr (or check HERDR_SOCKET_PATH)`);
   }
 
   return problems.length ? { ok: false, problems } : { ok: true };

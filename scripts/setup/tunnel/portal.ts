@@ -29,10 +29,10 @@ export function readyUrlFrom(line: string): string | null {
 export function askName(hostname: string): string {
   const def = portalName(hostname);
   for (;;) {
-    const typed = ask(`Nombre del túnel [${def}]: `).trim();
+    const typed = ask(`Tunnel name [${def}]: `).trim();
     if (!typed) return def;
     if (isValidName(typed)) return typed;
-    console.log("Nombre no válido: usa solo minúsculas, números y guiones (máx. 63, sin guion al inicio o al final).");
+    console.log("Invalid name: use only lowercase letters, digits and hyphens (max. 63, no hyphen at the start or end).");
   }
 }
 
@@ -54,7 +54,7 @@ export async function portalBin(run: Runner = defaultRun): Promise<string | null
 export async function ensureInstalled(run: Runner = defaultRun): Promise<string> {
   const have = await portalBin(run);
   if (have) return have;
-  console.log("Instalando Portal (sin sudo, en tu usuario)...");
+  console.log("Installing Portal (no sudo, for your user only)...");
   // pipefail: a failed curl must not look like a successful (empty) bash run
   const r = await run(
     [
@@ -64,10 +64,10 @@ export async function ensureInstalled(run: Runner = defaultRun): Promise<string>
     ],
     { inherit: true },
   );
-  if (r.code !== 0) throw new Error("Falló la instalación de Portal");
+  if (r.code !== 0) throw new Error("Portal installation failed");
   const bin = await portalBin(run);
   if (!bin) {
-    throw new Error("Portal se instaló pero no se encuentra el binario `portal` (se buscó en PATH, ~/.local/bin, ~/bin y /usr/local/bin)");
+    throw new Error("Portal was installed but the `portal` binary cannot be found (searched PATH, ~/.local/bin, ~/bin and /usr/local/bin)");
   }
   return bin;
 }
@@ -76,7 +76,7 @@ function spawnPortal(bin: string, name: string, port: number) {
   try {
     return Bun.spawn([bin, ...exposeArgs(name, port)], { stdout: "pipe", stderr: "pipe" });
   } catch {
-    throw new Error(`No se pudo ejecutar Portal (${bin}). Revisa que esté instalado y en el PATH.`);
+    throw new Error(`Could not run Portal (${bin}). Check that it is installed and on PATH.`);
   }
 }
 
@@ -88,7 +88,7 @@ export async function probeUrl(name: string, port: number, bin = "portal", timeo
   const dec = new TextDecoder();
   try {
     return await new Promise<string>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("Portal no publicó una URL en 60 s")), Math.max(0, deadline - Date.now()));
+      const timer = setTimeout(() => reject(new Error("Portal did not publish a URL within 60 s")), Math.max(0, deadline - Date.now()));
       let open = readers.length;
       for (const rd of readers) {
         (async () => {
@@ -110,7 +110,7 @@ export async function probeUrl(name: string, port: number, bin = "portal", timeo
           }
           if (--open === 0) {
             clearTimeout(timer);
-            reject(new Error("Portal terminó sin publicar una URL"));
+            reject(new Error("Portal exited without publishing a URL"));
           }
         })().catch(reject);
       }

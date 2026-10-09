@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ago } from "./home.ts";
 
 /**
- * "hace 12 s" that keeps counting by itself: ticks every second during the first minute,
+ * "12s ago" that keeps counting by itself: ticks every second during the first minute,
  * then every 15 s, so each label stays current without re-rendering the page.
  */
 export function Ago({ at, className, fallback = null }: { at: number | null; className?: string; fallback?: React.ReactNode }) {

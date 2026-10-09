@@ -8,10 +8,10 @@ import { Icon } from "./Home.tsx";
 const KINDS: SessionKind[] = ["shell", "claude", "codex", "opencode"];
 
 const PERMISSIONS: { id: Permission; label: string; desc: string; danger?: boolean }[] = [
-  { id: "ask", label: "Preguntar siempre", desc: "Cada edición y comando pasa por ti." },
-  { id: "edits", label: "Aceptar ediciones", desc: "Edita archivos solo; pide permiso para la terminal." },
-  { id: "plan", label: "Solo planear", desc: "Lee y propone un plan, sin tocar nada." },
-  { id: "bypass", label: "Sin permisos (bypass)", desc: "Edita y ejecuta comandos sin preguntarte. Úsalo solo en carpetas de confianza.", danger: true },
+  { id: "ask", label: "Always ask", desc: "Every edit and command goes through you." },
+  { id: "edits", label: "Accept edits", desc: "Edits files on its own; asks before running commands." },
+  { id: "plan", label: "Plan only", desc: "Reads and proposes a plan without changing anything." },
+  { id: "bypass", label: "Bypass permissions", desc: "Edits and runs commands without asking you. Only use it in folders you trust.", danger: true },
 ];
 
 /** the permissions each agent can start with (the server checks the same); never remembered */
@@ -76,7 +76,7 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
   // a choice the new agent does not have falls back to asking
   const perm = permOptions.find((p) => p.id === permission) ?? PERMISSIONS[0]!;
   const summary = permOptions.length === 0 ? sessionName : `${sessionName} · ${perm.label}`;
-  const startLabel = isShell ? "Abrir terminal" : `Iniciar ${look.label}`;
+  const startLabel = isShell ? "Open terminal" : `Start ${look.label}`;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -121,7 +121,7 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
       onCreated(created.pane_id);
     } catch (e) {
       setBusy(false);
-      setError(e instanceof ApiFailure && e.code === "invalid_session" ? "Revisa la carpeta y los datos de la sesión." : e instanceof ApiFailure && e.status === 502 ? "Herdr no pudo crear la sesión." : "No se pudo crear la sesión.");
+      setError(e instanceof ApiFailure && e.code === "invalid_session" ? "Check the folder and the session details." : e instanceof ApiFailure && e.status === 502 ? "Herdr couldn't create the session." : "Couldn't create the session.");
     }
   };
 
@@ -137,15 +137,15 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
         className="relative flex w-full max-w-[640px] flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-dialog"
       >
         <div className="flex items-center gap-3 pt-[18px] pr-4 pb-1.5 pl-6">
-          <h1 id="ns-title" className="text-[26px] font-extrabold tracking-[-0.03em]">Nueva sesión</h1>
-          <button type="button" onClick={onClose} aria-label="Cerrar" className="ml-auto flex size-11 cursor-pointer items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-ink">
+          <h1 id="ns-title" className="text-[26px] font-extrabold tracking-[-0.03em]">New session</h1>
+          <button type="button" onClick={onClose} aria-label="Close" className="ml-auto flex size-11 cursor-pointer items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-ink">
             <Icon d="M6 6l12 12M18 6L6 18" size={18} width={2.2} />
           </button>
         </div>
 
         <div className="flex flex-col gap-[22px] px-6 pt-3 pb-6 max-sm:px-4">
           <div className="flex flex-col gap-2.5">
-            <span className="text-[13px] font-bold text-muted">Dónde</span>
+            <span className="text-[13px] font-bold text-muted">Where</span>
             <button
               type="button"
               onClick={() => setExplorer(!explorer)}
@@ -154,14 +154,14 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
             >
               <FolderIcon />
               <span className="min-w-0 flex-1 truncate">{path}</span>
-              <span className="font-sans text-sm font-semibold text-accent-ink">{explorer ? "Listo" : "Cambiar"}</span>
+              <span className="font-sans text-sm font-semibold text-accent-ink">{explorer ? "Done" : "Change"}</span>
             </button>
             {explorer ? (
               <Explorer path={path} onPath={setPath} onDone={() => setExplorer(false)} />
             ) : (
               recents.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-0.5 text-[13px] text-muted">Recientes</span>
+                  <span className="mr-0.5 text-[13px] text-muted">Recent</span>
                   {recents.map((r) => (
                     <button
                       key={r}
@@ -179,7 +179,7 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
           </div>
 
           <div className="flex flex-col gap-2.5">
-            <span id="ns-kind" className="text-[13px] font-bold text-muted">Con qué</span>
+            <span id="ns-kind" className="text-[13px] font-bold text-muted">With</span>
             <div role="radiogroup" aria-labelledby="ns-kind" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {KINDS.map((k, i) => {
                 const on = k === kind;
@@ -208,7 +208,7 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
           {isShell ? (
             <div className="flex flex-col gap-2">
               <label htmlFor="ns-cmd" className="text-[13px] font-bold text-muted">
-                Comando al abrir <span className="font-normal">(opcional)</span>
+                Command on open <span className="font-normal">(optional)</span>
               </label>
               <div className="flex items-center overflow-hidden rounded-[14px] border border-term-line bg-term">
                 <span className="pr-1 pl-4 font-mono text-[15px] text-term-prompt">$</span>
@@ -234,7 +234,7 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
           ) : (
             <div className="flex flex-col gap-2">
               <label htmlFor="ns-msg" className="text-[13px] font-bold text-muted">
-                Primer mensaje <span className="font-normal">(opcional)</span>
+                First message <span className="font-normal">(optional)</span>
               </label>
               <textarea
                 id="ns-msg"
@@ -244,7 +244,7 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
                 }}
-                placeholder="¿Qué quieres que haga? Puedes dejarlo vacío y escribir después."
+                placeholder="What should it do? You can leave this empty and write later."
                 className="resize-none rounded-[14px] border border-line bg-inset px-4 py-3.5 text-base leading-normal text-ink outline-none placeholder:text-muted focus:border-accent-ink"
               />
             </div>
@@ -253,13 +253,13 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
           <div className="flex flex-col rounded-[14px] border border-line">
             <button type="button" onClick={() => setOptionsOpen(!optionsOpen)} aria-expanded={optionsOpen} className="flex min-h-12 cursor-pointer items-center gap-2.5 rounded-[14px] px-3.5 text-left text-sm">
               <Icon d="M9 6l6 6-6 6" size={14} width={2.4} className={`shrink-0 text-muted transition-transform duration-150 ${optionsOpen ? "rotate-90" : ""}`} />
-              <span className="font-semibold">Opciones</span>
+              <span className="font-semibold">Options</span>
               <span className="min-w-0 flex-1 truncate text-right font-mono text-xs text-muted">{summary}</span>
             </button>
             {optionsOpen && (
               <div className="flex flex-col gap-4 px-3.5 pt-1 pb-4">
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="ns-name" className="text-[13px] font-bold">Nombre</label>
+                  <label htmlFor="ns-name" className="text-[13px] font-bold">Name</label>
                   <input
                     id="ns-name"
                     type="text"
@@ -271,7 +271,7 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
                 </div>
                 {permOptions.length > 0 && (
                   <div role="radiogroup" aria-labelledby="ns-perm" className="flex flex-col gap-1.5">
-                    <span id="ns-perm" className="text-[13px] font-bold">Permisos</span>
+                    <span id="ns-perm" className="text-[13px] font-bold">Permissions</span>
                     <div className="flex flex-wrap gap-1.5">
                       {permOptions.map((p) => (
                         <button
@@ -303,13 +303,13 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
         </div>
 
         <div className="flex items-center gap-3 border-t border-line bg-foot py-3.5 pr-4 pl-6 max-sm:pl-4">
-          <span className="text-[13px] text-muted max-sm:hidden">Recordamos tu última carpeta y elección</span>
+          <span className="text-[13px] text-muted max-sm:hidden">We remember your last folder and choice</span>
           <button
             type="submit"
             disabled={busy}
             className="ml-auto flex h-12 cursor-pointer items-center gap-2.5 rounded-full bg-accent px-[22px] text-base font-semibold text-white disabled:cursor-wait disabled:opacity-70 max-sm:w-full max-sm:justify-center"
           >
-            {busy ? "Iniciando…" : startLabel}
+            {busy ? "Starting…" : startLabel}
             {!busy && <span className="rounded-md bg-white/20 px-[7px] py-0.5 font-mono text-xs">⏎</span>}
           </button>
         </div>
@@ -342,7 +342,7 @@ function Explorer({ path, onPath, onDone }: { path: string; onPath: (path: strin
 
   return (
     <div className="flex flex-col overflow-hidden rounded-[14px] border border-line">
-      <nav aria-label="Ruta" className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-2.5">
+      <nav aria-label="Path" className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-2.5">
         {crumbs.map((c, i) => {
           const last = i === crumbs.length - 1;
           return (
@@ -367,9 +367,9 @@ function Explorer({ path, onPath, onDone }: { path: string; onPath: (path: strin
             ..
           </button>
         )}
-        {failed && <p className="px-2.5 py-3 text-sm text-danger-ink">No se pudo leer esta carpeta.</p>}
-        {!failed && dirs === null && <p className="px-2.5 py-3 text-sm text-muted">Cargando…</p>}
-        {dirs?.length === 0 && <p className="px-2.5 py-3 text-sm text-muted">Sin subcarpetas.</p>}
+        {failed && <p className="px-2.5 py-3 text-sm text-danger-ink">Couldn't read this folder.</p>}
+        {!failed && dirs === null && <p className="px-2.5 py-3 text-sm text-muted">Loading…</p>}
+        {dirs?.length === 0 && <p className="px-2.5 py-3 text-sm text-muted">No subfolders.</p>}
         {dirs?.map((d) => (
           <button key={d.name} type="button" onClick={() => onPath(`${path}/${d.name}`)} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-2.5 text-left text-[15px] hover:bg-inset">
             <FolderIcon size={16} />
@@ -381,7 +381,7 @@ function Explorer({ path, onPath, onDone }: { path: string; onPath: (path: strin
       </div>
       <div className="flex justify-end border-t border-line bg-inset px-2.5 py-2">
         <button type="button" onClick={onDone} className="min-h-10 cursor-pointer rounded-full bg-inverse px-4 text-sm font-semibold text-inverse-ink">
-          Usar {folder}
+          Use {folder}
         </button>
       </div>
     </div>
