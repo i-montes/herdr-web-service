@@ -177,6 +177,37 @@ export function readyPrompts(roster: Roster): { pane_id: string; text: string }[
   return ready;
 }
 
+/**
+ * Sends a held first message. An agent can report idle a moment (~1–2 s) before its input is
+ * really ready, and what it gets then is lost in one of two ways: OpenCode drops the text (the
+ * box stays empty), Claude Code keeps the text but not the Enter. So when the agent shows no sign
+ * of the send (no state change within `settleMs`) the screen decides: our text still in the box
+ * gets an Enter, a vanished one is sent again. Herdr's state_change_seq, not "working", is the
+ * sign: an answer quick enough to be idle again by the check still moves it.
+ */
+export async function deliverFirstPrompt(herdr: Requester, pane_id: string, text: string, opts = { attempts: 4, settleMs: 5000, pollMs: 250, wait: (ms: number) => Bun.sleep(ms) }): Promise<void> {
+  type Agent = { agent?: { state_change_seq?: number } };
+  const seq = async () => (await herdr.request<Agent>("agent.get", { target: pane_id })).agent?.state_change_seq ?? 0;
+  const squash = (s: string) => s.replace(/\s+/g, " ").trim();
+  // short, so a box that wraps the message does not split it
+  const probe = squash(text).slice(0, 16);
+  for (let attempt = 1; ; attempt++) {
+    const before = await seq();
+    if (attempt === 1) {
+      await herdr.request("agent.prompt", { target: pane_id, text });
+    } else {
+      const screen = await herdr.request<{ read: { text: string } }>("pane.read", { pane_id, source: "visible", strip_ansi: true });
+      if (squash(screen.read.text).includes(probe)) await herdr.request("pane.send_keys", { pane_id, keys: ["enter"] });
+      else await herdr.request("agent.prompt", { target: pane_id, text });
+    }
+    for (let waited = 0; waited < opts.settleMs; waited += opts.pollMs) {
+      await opts.wait(opts.pollMs);
+      if ((await seq()) !== before) return;
+    }
+    if (attempt >= opts.attempts) throw new Error(`the agent in ${pane_id} did not take its first message`);
+  }
+}
+
 export function _resetPrompts(): void {
   pendingPrompts.clear();
 }

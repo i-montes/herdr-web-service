@@ -17,7 +17,7 @@ import { clientAddress, factsFrom, hostAllowed, isSecure, loginTransportAllowed,
 import { STATE_DIR, config } from "./config.ts";
 import { HerdrClient, HerdrError } from "./herdr/client.ts";
 import { buildRoster, type StatusMemory } from "./herdr/roster.ts";
-import { launchSession, parseNewSession, readyPrompts } from "./herdr/launch.ts";
+import { deliverFirstPrompt, launchSession, parseNewSession, readyPrompts } from "./herdr/launch.ts";
 import { paneIdFrom, parsePaneInput } from "./herdr/panes.ts";
 import { listDirs } from "./fsbrowse.ts";
 import { MAX_UPLOAD, cleanupUploads, saveUpload, uploadPath } from "./uploads.ts";
@@ -65,7 +65,7 @@ function scheduleRoster(force = false): void {
       const roster = await loadRoster();
       watchStatuses(roster);
       for (const prompt of readyPrompts(roster)) {
-        herdr.request("agent.prompt", { target: prompt.pane_id, text: prompt.text }).catch((error) => console.error("first message:", error instanceof Error ? error.message : error));
+        deliverFirstPrompt(herdr, prompt.pane_id, prompt.text).catch((error) => console.error("first message:", error instanceof Error ? error.message : error));
       }
       const text = JSON.stringify(roster);
       if (text === lastRoster && !forceRoster) return;
@@ -409,6 +409,10 @@ const server = Bun.serve<WsData>({
     },
   },
 });
+
+// follow Herdr from the start, not only once a browser connects: a new session's first message
+// waits for its agent to turn idle, and only a roster read sees that
+void ensureSubscribed().then(() => scheduleRoster(true));
 
 // uploaded images older than a week go, even where the system never cleans its temp folder
 cleanupUploads();

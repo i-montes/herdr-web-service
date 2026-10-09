@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Roster } from "../../shared/protocol.ts";
-import { _resetPrompts, agentName, launchSession, parseNewSession, readyPrompts, type Requester } from "./launch.ts";
+import { _resetPrompts, agentName, deliverFirstPrompt, launchSession, parseNewSession, readyPrompts, type Requester } from "./launch.ts";
 import { uploadDir } from "../uploads.ts";
 
 const home = realpathSync(mkdtempSync(join(tmpdir(), "hw-launch-")));
@@ -175,4 +175,60 @@ test("a pane whose agent cannot start is closed again, not left as an empty shel
   if (!parsed.ok) throw new Error(parsed.error);
   await expect(launchSession(h, parsed.value, roster, home, noWait)).rejects.toThrow("unknown agent kind");
   expect(h.calls.at(-1)).toEqual(["pane.close", { pane_id: "w1:p9" }]);
+});
+
+/**
+ * A Herdr whose agent ignores the first `early` sends. "drops" loses early text (OpenCode),
+ * "keeps" leaves it in the box without the Enter (Claude Code); `early < 0` never takes it.
+ */
+function agentHerdr(early: number, mode: "drops" | "keeps" = "drops") {
+  let seq = 5;
+  let box = "";
+  let sends = 0;
+  const h = {
+    prompts: 0,
+    enters: 0,
+    async request<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+      if (method === "agent.get") return { agent: { state_change_seq: seq } } as T;
+      if (method === "pane.read") return { read: { text: `> ${box}` } } as T;
+      if (method === "agent.prompt") {
+        h.prompts++;
+        if (mode === "keeps") box += String(params["text"]);
+      }
+      if (method === "pane.send_keys") h.enters++;
+      if (method === "agent.prompt" || method === "pane.send_keys") {
+        if (early >= 0 && ++sends > early) {
+          seq++;
+          box = "";
+        }
+      }
+      return { type: "ok" } as T;
+    },
+  };
+  return h;
+}
+const quick = { attempts: 4, settleMs: 30, pollMs: 10, wait: async () => {} };
+
+test("first message: a send the agent takes is not repeated", async () => {
+  const h = agentHerdr(0);
+  await deliverFirstPrompt(h, "w1:p1", "fix the discount bug", quick);
+  expect([h.prompts, h.enters]).toEqual([1, 0]);
+});
+
+test("first message: text dropped while the agent was still loading goes again", async () => {
+  const h = agentHerdr(2, "drops");
+  await deliverFirstPrompt(h, "w1:p1", "fix the discount bug", quick);
+  expect([h.prompts, h.enters]).toEqual([3, 0]);
+});
+
+test("first message: text left in the box gets an Enter, never a second copy", async () => {
+  const h = agentHerdr(2, "keeps");
+  await deliverFirstPrompt(h, "w1:p1", "fix the discount bug", quick);
+  expect([h.prompts, h.enters]).toEqual([1, 2]);
+});
+
+test("first message: gives up after the last attempt", async () => {
+  const h = agentHerdr(-1);
+  await expect(deliverFirstPrompt(h, "w1:p1", "hi", quick)).rejects.toThrow("did not take its first message");
+  expect(h.prompts).toBe(4);
 });

@@ -39,7 +39,11 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   - `herdr/roster.ts` — `session.snapshot` → roster (workspaces + paneles) que dibuja la web.
   - `herdr/launch.ts` — crea sesiones (`POST /api/sessions`): pestaña en el workspace de esa
     carpeta o workspace nuevo; arranca shell o agente; el primer mensaje espera a que el agente
-    quede `idle` (si no, caería en el aviso de confianza de Claude). Permisos por agente
+    quede `idle` (si no, caería en el aviso de confianza de Claude) y `deliverFirstPrompt` lo
+    confirma: el agente avisa `idle` 1–2 s antes de aceptar teclas (OpenCode pierde el texto,
+    Claude se queda sin el Enter); sin cambio de `state_change_seq` en 5 s, mira la pantalla y
+    reenvía o pulsa Enter. El servidor sigue a Herdr desde que arranca (no solo con un navegador
+    conectado), para que ese mensaje salga aunque nadie mire. Permisos por agente
     (`KIND_PERMISSIONS`): Claude `ask|edits|plan|bypass` (`--dangerously-skip-permissions`),
     OpenCode `ask|bypass` (`--auto`), shell y Codex solo `ask`. La web nunca recuerda el bypass.
   - `chat/` — chat de Claude Code (`GET /api/panes/:id/chat?v=`, `POST …/prompt`, `POST …/choose`):
