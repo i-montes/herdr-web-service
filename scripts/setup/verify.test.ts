@@ -50,4 +50,17 @@ describe("verifyHealth", () => {
   test("a trailing slash in the URL is tolerated", async () => {
     expect(await verifyHealth(`http://127.0.0.1:${ok.port}/`)).toEqual({ ok: true });
   });
+  test("this machine cannot resolve the name: checked through public DNS, with a note", async () => {
+    const asked: string[] = [];
+    const resolvePublic = async (host: string) => (asked.push(host), ["127.0.0.1"]);
+    const r = await verifyHealth(`http://herdr-test.invalid:${ok.port}`, 2000, { resolvePublic });
+    expect(asked).toEqual(["herdr-test.invalid"]);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.note).toContain("herdr-test.invalid");
+  });
+  test("public DNS does not know it either: still the DNS failure", async () => {
+    const r = await verifyHealth(`http://herdr-test.invalid:${ok.port}`, 600, { resolvePublic: async () => [] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("resolver");
+  });
 });

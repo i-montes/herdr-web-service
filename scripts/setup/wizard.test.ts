@@ -40,7 +40,7 @@ function harness(opts: {
   running?: Unit[];
   tunnel?: (kind: TunnelKind, port: number) => TunnelResult;
   units?: Unit[];
-  health?: ({ ok: true } | { ok: false; reason: string })[];
+  health?: ({ ok: true; note?: string } | { ok: false; reason: string })[];
   lan?: string | null;
   installResult?: "installed" | "unchanged";
   statusLine?: () => InstallResult;
@@ -306,6 +306,13 @@ describe("runWizard", () => {
     const h = harness({ chooses: ["local"], health: [{ ok: false, reason: "x" }], answers: { "¿Reintentar?": false } });
     await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
     expect(h.calls).not.toContain("enter");
+  });
+
+  test("a note from the health check is shown, and the summary still follows", async () => {
+    const h = harness({ chooses: ["local"], health: [{ ok: true, note: "Este equipo aún no resuelve x.ts.net" }] });
+    await runWizard(h.deps);
+    expect(h.output()).toContain("Este equipo aún no resuelve x.ts.net");
+    expect(h.output()).toContain("Listo.");
   });
 
   describe("Claude Code status line", () => {

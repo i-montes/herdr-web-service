@@ -357,6 +357,7 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
       const health = await deps.verifyHealth(url);
       if (health.ok) {
         log("Responde.");
+        if (health.note) log(health.note);
         break;
       }
       log(`No responde: ${health.reason}`);
