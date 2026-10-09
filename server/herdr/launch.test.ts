@@ -101,3 +101,44 @@ test("a pending message is dropped when its pane closes", () => {
     expect(readyPrompts({ workspaces: [], panes: [{ pane_id: "w1:p9", workspace_id: "w1", tab_id: "t", agent: "claude", status: "idle", title: null, label: null, cwd: "", focused: false, changed_at: null }] })).toEqual([]);
   });
 });
+
+/** a fake Herdr whose new pane takes `notReady` agent.start attempts to have a shell (a slow VPS) */
+function slowShell(notReady: number, error = "agent target pane w1:p9 is not an available shell") {
+  const h = fake();
+  let refused = 0;
+  const request = h.request.bind(h);
+  h.request = async <T>(method: string, params: Record<string, unknown> = {}): Promise<T> => {
+    if (method === "agent.start" && refused < notReady) {
+      refused++;
+      h.calls.push([method, params]);
+      throw new Error(error);
+    }
+    return request<T>(method, params);
+  };
+  return h;
+}
+
+const noWait = { wait: async () => {}, timeoutMs: 10_000 };
+
+test("an agent waits for the new pane's shell to be ready", async () => {
+  const h = slowShell(2);
+  const parsed = parseNewSession({ cwd: "~/p/app", kind: "claude" }, home);
+  if (!parsed.ok) throw new Error(parsed.error);
+  expect(await launchSession(h, parsed.value, roster, home, noWait)).toEqual({ pane_id: "w1:p9" });
+  expect(h.calls.filter(([m]) => m === "agent.start")).toHaveLength(3);
+});
+
+test("any other agent.start error fails at once", async () => {
+  const h = slowShell(5, "unknown agent kind");
+  const parsed = parseNewSession({ cwd: "~/p/app", kind: "claude" }, home);
+  if (!parsed.ok) throw new Error(parsed.error);
+  await expect(launchSession(h, parsed.value, roster, home, noWait)).rejects.toThrow("unknown agent kind");
+  expect(h.calls.filter(([m]) => m === "agent.start")).toHaveLength(1);
+});
+
+test("a shell that never gets ready gives up after the timeout", async () => {
+  const h = slowShell(Infinity);
+  const parsed = parseNewSession({ cwd: "~/p/app", kind: "claude" }, home);
+  if (!parsed.ok) throw new Error(parsed.error);
+  await expect(launchSession(h, parsed.value, roster, home, { wait: () => Bun.sleep(5), timeoutMs: 50 })).rejects.toThrow("not an available shell");
+});

@@ -170,7 +170,9 @@ async function route(request: Request, facts: RequestFacts, server: import("bun"
     } catch (error) {
       if (error instanceof HerdrError && error.code === "pane_not_found") return apiError("pane_not_found", "that session is closed", 404);
       const code = error instanceof HerdrError ? error.code : "herdr_unavailable";
-      return apiError(code, error instanceof Error ? error.message : String(error), 502);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`${method} ${pathname}: ${code}: ${message}`);
+      return apiError(code, message, 502);
     }
   }
 

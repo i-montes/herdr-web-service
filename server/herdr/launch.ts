@@ -77,7 +77,39 @@ export function agentArgs(kind: SessionKind, permission: Permission, imageDir = 
 /** pane_id → first message waiting for its agent to be ready */
 const pendingPrompts = new Map<string, string>();
 
-export async function launchSession(herdr: Requester, input: NewSession, roster: Roster, home: string): Promise<{ pane_id: string }> {
+/** how long a new pane may take to have a shell an agent can start in (slow shells on a VPS) */
+const SHELL_READY_MS = 10_000;
+
+/**
+ * `agent.start` on a pane created a moment ago: Herdr refuses until the pane's shell is up
+ * ("is not an available shell", ~0.5 s on a small VPS), so that one error is retried.
+ */
+async function startAgent(herdr: Requester, params: Record<string, unknown>, opts: LaunchOptions): Promise<void> {
+  const deadline = Date.now() + opts.timeoutMs;
+  for (;;) {
+    try {
+      await herdr.request("agent.start", params);
+      return;
+    } catch (error) {
+      const notReady = error instanceof Error && error.message.includes("not an available shell");
+      if (!notReady || Date.now() >= deadline) throw error;
+      await opts.wait(200);
+    }
+  }
+}
+
+export interface LaunchOptions {
+  wait: (ms: number) => Promise<void>;
+  timeoutMs: number;
+}
+
+export async function launchSession(
+  herdr: Requester,
+  input: NewSession,
+  roster: Roster,
+  home: string,
+  opts: LaunchOptions = { wait: (ms) => Bun.sleep(ms), timeoutMs: SHELL_READY_MS },
+): Promise<{ pane_id: string }> {
   const workspace = roster.workspaces.find((w) => w.path && expandHome(w.path, home) === input.cwd);
   type Created = { root_pane: { pane_id: string; tab_id: string } };
   let created: Created;
@@ -92,7 +124,7 @@ export async function launchSession(herdr: Requester, input: NewSession, roster:
   if (input.kind === "shell") {
     if (input.command) await herdr.request("pane.send_text", { pane_id, text: input.command + "\n" });
   } else {
-    await herdr.request("agent.start", { name: input.name, kind: input.kind, pane_id, args: agentArgs(input.kind, input.permission) });
+    await startAgent(herdr, { name: input.name, kind: input.kind, pane_id, args: agentArgs(input.kind, input.permission) }, opts);
     if (input.message) pendingPrompts.set(pane_id, input.message);
   }
   return { pane_id };
