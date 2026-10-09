@@ -7,6 +7,7 @@ import { NewSessionDialog } from "./NewSession.tsx";
 import { OpenOnPhone } from "./OpenOnPhone.tsx";
 import { AlertSettings } from "./AlertSettings.tsx";
 import { DevicesButton } from "./Devices.tsx";
+import { HostPanel } from "./HostPanel.tsx";
 import { sessionHref } from "./roster.ts";
 import { FILTERS, STATUS_LABEL, BUCKET_OF, agentLook, chipTime, homeView, longDate, openFor, plural, sessionName, type Filter, type WorkspaceGroup } from "./home.ts";
 import { useTheme } from "./theme.ts";
@@ -147,6 +148,8 @@ export function Home({ session, roster, connected, live, onLogout, onCreated }: 
               />
             </div>
           </header>
+
+          <HostPanel />
 
           <div role="group" aria-label="Filter by status" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0">
             {FILTERS.map((f) => {

@@ -93,6 +93,13 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
     (frame `notify`: toast y sonido en la web) y por Web Push a las suscripciones vivas, salvo a la
     del navegador que tiene la web visible (frames `presence`). El cuerpo de un "needs you" es la
     pregunta del menú que espera.
+  - `host/` — salud del host para Inicio: `monitor.ts` lee cada 5 s CPU (con `steal` e `iowait`
+    en Linux), memoria, swap, carga, red (solo interfaces físicas: `/sys/class/net/*/device`) y
+    discos (`df`, cada 30 s), y guarda la última hora; los procesos solo se recorren con algún
+    navegador conectado (agrupados por programa, CPU como % de la máquina, sin argumentos: pueden
+    llevar tokens). Linux lee `/proc`; macOS usa `vm_stat`, `sysctl`, `netstat` y `ps`. `parse.ts`
+    son los lectores puros. Va por `/ws` (frame `host`: la hora entera al conectar, luego cada
+    lectura); la web: `host.ts` (estado y reglas de salud) y `HostPanel.tsx`.
   - `push/` — Web Push sin dependencias: `webpush.ts` (VAPID ES256 y cifrado aes128gcm del
     RFC 8291 sobre WebCrypto; el test reproduce byte a byte el ejemplo del RFC) y `store.ts`
     (claves VAPID en `<config dir>/vapid.json`, suscripciones en `<state dir>/push.json`, ambas

@@ -50,11 +50,65 @@ export interface ApiError {
   error: { code: string; message: string };
 }
 
-/** Server → browser frames on /ws */
+/** Server → browser frames on /ws. `host`: the whole last hour on connect (`history`), then each new reading */
 export type ServerFrame =
   | { type: "roster"; roster: Roster }
   | { type: "herdr"; connected: boolean }
-  | { type: "notify"; notice: Notice };
+  | { type: "notify"; notice: Notice }
+  | { type: "host"; info: HostInfo; samples: HostSample[]; history: boolean };
+
+/** one reading of the host (every `HostInfo.interval_ms`); the charts draw the last hour of them */
+export interface HostSample {
+  t: number;
+  /** % of all the CPU time busy */
+  cpu: number;
+  /** % taken by the hypervisor for other machines (Linux); a VPS's noisy neighbours */
+  steal: number | null;
+  /** % idle waiting on the disk (Linux) */
+  iowait: number | null;
+  /** bytes of memory in use, without the caches the system can drop */
+  mem: number;
+  swap: number | null;
+  load1: number;
+  /** bytes per second over the physical network interfaces */
+  rx: number | null;
+  tx: number | null;
+}
+
+export interface HostDisk {
+  mount: string;
+  used: number;
+  total: number;
+}
+
+/** the processes of one program, added up ("postgres ×4") */
+export interface HostProcess {
+  name: string;
+  count: number;
+  /** % of the whole machine's CPU (as the CPU tile); null until two readings exist */
+  cpu: number | null;
+  /** resident memory, bytes */
+  mem: number;
+}
+
+/** what changes slowly or needs no chart: the machine, disks, load and the heaviest processes */
+export interface HostInfo {
+  hostname: string;
+  /** "Ubuntu 24.04.4 LTS", "macOS 15.1" */
+  os: string;
+  arch: string;
+  cores: number;
+  cpu_model: string | null;
+  mem_total: number;
+  swap_total: number | null;
+  boot_at: number;
+  load: [number, number, number];
+  disks: HostDisk[];
+  processes: number;
+  top_cpu: HostProcess[];
+  top_mem: HostProcess[];
+  interval_ms: number;
+}
 
 /**
  * Browser → server frames on /ws. `presence`: whether the tab is in view, and the push

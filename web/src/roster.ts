@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { ClientFrame, Roster, ServerFrame } from "../../shared/protocol.ts";
 import { attending, emitNotice, onAlertsChange, pushEndpoint } from "./alerts.ts";
 import { api } from "./api.ts";
+import { receiveHost } from "./host.ts";
 
 /** how often a tab being looked at confirms it (the server forgets it after PRESENCE_TTL_MS there) */
 const PRESENCE_MS = 20_000;
@@ -61,6 +62,7 @@ export function useRoster(initiallyConnected: boolean): { roster: Roster; connec
           setConnected(true);
         } else if (frame.type === "herdr") setConnected(frame.connected);
         else if (frame.type === "notify") emitNotice(frame.notice);
+        else if (frame.type === "host") receiveHost(frame.info, frame.samples, frame.history);
       };
       socket.onclose = (event) => {
         if (ws !== socket || stopped) return;

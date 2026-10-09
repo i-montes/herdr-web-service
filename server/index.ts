@@ -32,6 +32,7 @@ import { opencodeCatalog, opencodeUsage, opencodeVariants, parseOpencodeFooter, 
 import { apiError, isRegularFile, json, withHeaders } from "./http.ts";
 import { socketsOfSession, staleSockets } from "./ws.ts";
 import { NoticeWatch } from "./notify.ts";
+import { HostMonitor } from "./host/monitor.ts";
 import { addSubscription, liveSubscriptions, parseSubscription, removeSubscription, removeSubscriptionsOf, sessionsWithPush, vapidKeys } from "./push/store.ts";
 import { sendPush } from "./push/webpush.ts";
 
@@ -499,6 +500,7 @@ const server = Bun.serve<WsData>({
       clients.add(ws);
       void ensureSubscribed();
       scheduleRoster(true);
+      ws.send(JSON.stringify({ type: "host", info: host.current(), samples: host.history, history: true } satisfies ServerFrame));
     },
     message(ws, message) {
       let frame: ClientFrame | null = null;
@@ -523,6 +525,11 @@ const server = Bun.serve<WsData>({
 // follow Herdr from the start, not only once a browser connects: a new session's first message
 // waits for its agent to turn idle, and only a roster read sees that
 void ensureSubscribed().then(() => scheduleRoster(true));
+
+// the host's health for Home: always sampled (the charts show the last hour), processes only
+// scanned while a browser is connected
+const host = new HostMonitor();
+host.start(() => clients.size > 0, (info, sample) => broadcast({ type: "host", info, samples: [sample], history: false }));
 
 // uploaded images older than a week go, even where the system never cleans its temp folder
 cleanupUploads();

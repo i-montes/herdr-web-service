@@ -33,6 +33,9 @@ computer, on your home network or on a VPS, and installs with a single command.
   desktop (turn them on per device; they need HTTPS, and on an iPhone the app installed on the
   home screen), plus a toast and a sound while the app is open. Mute the sound from Home or a
   session's `⋯` menu.
+- **Host health, live**: Home shows CPU, memory, disk and network with the last hour charted, a
+  verdict (healthy, watch, critical) that says what is wrong (including a VPS's CPU steal), and
+  the programs using the most CPU and memory.
 - **What the agent left running**: a tab above the chat input lists its subagents, background
   commands and monitors, so a long "Working…" explains itself.
 - **Images in the chat** (PNG, JPEG, GIF, WebP) for the agent to read.
