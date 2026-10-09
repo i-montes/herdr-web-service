@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  installUnit, renderLaunchAgent, renderSystemdUnit, restartUnit, stopUnit, uninstallUnit, unitInstalled, unitPath, unitRunning,
+  currentUser, installUnit, renderLaunchAgent, renderSystemdUnit, restartUnit, stopUnit, uninstallUnit, unitInstalled, unitPath, unitRunning,
   type UnitParams,
 } from "./service.ts";
 
@@ -102,7 +102,7 @@ describe("installUnit", () => {
     expect(r.calls.map((c) => c.join(" "))).toEqual([
       "systemctl --user is-enabled herdr-web-service.service",
       "systemctl --user is-active herdr-web-service.service",
-      `loginctl enable-linger ${process.env.USER}`,
+      `loginctl enable-linger ${currentUser()}`,
     ]);
     expect(n).toBeGreaterThan(0);
     r.calls.length = 0;
@@ -111,7 +111,7 @@ describe("installUnit", () => {
       "systemctl --user daemon-reload",
       "systemctl --user enable --now herdr-web-service.service",
       "systemctl --user restart herdr-web-service.service",
-      `loginctl enable-linger ${process.env.USER}`,
+      `loginctl enable-linger ${currentUser()}`,
     ]);
   });
 

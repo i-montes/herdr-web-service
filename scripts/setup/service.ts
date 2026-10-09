@@ -5,6 +5,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { userInfo } from "node:os";
 
 export type Unit = "server" | "tunnel";
 
@@ -147,8 +148,11 @@ export function unitInstalled(u: Unit): boolean {
 const render = (u: Unit, p: UnitParams) => (isMac() ? renderLaunchAgent(u, p) : renderSystemdUnit(u, p));
 const domain = () => `gui/${process.getuid?.() ?? 0}`;
 
+/** the login name: $USER, or the system's answer when the environment lacks it (a bare env, CI) */
+export const currentUser = (): string => process.env.USER || userInfo().username;
+
 async function ensureLinger(run: Run): Promise<void> {
-  const user = process.env.USER ?? "";
+  const user = currentUser();
   if ((await run(["loginctl", "enable-linger", user])) === 0) return;
   console.log("Could not enable 'linger', so the service will only start when you log in.");
   console.log("To have it start at boot, run once:");
