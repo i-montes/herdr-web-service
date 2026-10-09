@@ -7,6 +7,7 @@
  * every piece of data it shows comes through the gated API).
  */
 import { existsSync } from "node:fs";
+import pkg from "../package.json" with { type: "json" };
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type { ChatResponse, ClientFrame, Notice, PanePrompt, Roster, ServerFrame, SessionInfo, SignIn } from "../shared/protocol.ts";
@@ -231,7 +232,7 @@ async function route(request: Request, facts: RequestFacts, server: import("bun"
     if (!originAllowed(facts, access)) return apiError("invalid_origin", "cross-origin request refused", 403);
   }
 
-  if (pathname === "/api/health") return json({ ok: true, version: "0.1.0" });
+  if (pathname === "/api/health") return json({ ok: true, version: pkg.version });
   if (pathname === "/api/auth/login" && method === "POST") {
     if (!loginTransportAllowed(facts, access)) return apiError("insecure_transport", "sign in over HTTPS", 403);
     const secure = isSecure(facts);

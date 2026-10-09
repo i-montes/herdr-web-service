@@ -1,6 +1,6 @@
 id = "imontes.herdr-web-service"
 name = "Herdr Web Service"
-version = "0.1.0"
+version = "0.2.0"
 min_herdr_version = "0.9.0"
 description = "Chat-style web client for Herdr agents, with real login and HTTPS, built to run on a public VPS with zero manual setup"
 platforms = ["linux", "macos"]

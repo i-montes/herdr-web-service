@@ -130,6 +130,8 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
 ## Reglas
 
 - Solo Bun (nada de Node). TypeScript estricto, `verbatimModuleSyntax`, imports con `.ts`.
+- Versión: en `herdr-plugin.toml` (la que muestra el marketplace) y en `package.json` (la de
+  `/api/health`); `tests/version.test.ts` exige que coincidan. Súbela en ambos al publicar.
 - Estado del usuario en `HERDR_PLUGIN_CONFIG_DIR` (`.env`, `auth.json`) y runtime en
   `HERDR_PLUGIN_STATE_DIR` (pid, sesiones, log). Nunca en el root del plugin.
 - La password solo se fija desde el host, nunca por HTTP. Todo `/api/*` y `/ws` salvo
