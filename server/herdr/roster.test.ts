@@ -13,7 +13,7 @@ const snapshot = {
     { tab_id: "w1:t2", label: "dev-server" },
   ],
   panes: [
-    { pane_id: "w1:p1", workspace_id: "w1", tab_id: "w1:t1", agent: "claude", agent_status: "blocked", terminal_title_stripped: "Migraciones", cwd: "/Users/ana/p/recoba", focused: true },
+    { pane_id: "w1:p1", workspace_id: "w1", tab_id: "w1:t1", terminal_id: "term_a", agent: "claude", agent_status: "blocked", terminal_title_stripped: "Migraciones", cwd: "/Users/ana/p/recoba", focused: true },
     { pane_id: "w1:p2", workspace_id: "w1", tab_id: "w1:t2", agent_status: "unknown", cwd: "/Users/ana/p/recoba/api", focused: false },
     { pane_id: "w1:p3", workspace_id: "w1", tab_id: "w1:t2", agent: "codex", agent_status: "weird", cwd: "/Users/ana/p/recoba", focused: false },
   ],
@@ -22,7 +22,7 @@ const snapshot = {
 test("maps workspaces and panes, shells have no agent, unknown statuses become unknown", () => {
   const roster = buildRoster(snapshot, new Map(), 1000, HOME);
   expect(roster.workspaces.map((w) => [w.workspace_id, w.label, w.path])).toEqual([["w1", "recoba", "~/p/recoba"], ["w2", "empty", ""]]);
-  expect(roster.panes[0]).toEqual({ pane_id: "w1:p1", workspace_id: "w1", tab_id: "w1:t1", agent: "claude", status: "blocked", title: "Migraciones", label: null, cwd: "~/p/recoba", focused: true, changed_at: null });
+  expect(roster.panes[0]).toEqual({ pane_id: "w1:p1", workspace_id: "w1", tab_id: "w1:t1", agent: "claude", status: "blocked", title: "Migraciones", label: null, cwd: "~/p/recoba", focused: true, changed_at: null, opened_at: null });
   expect(roster.panes[1]!.label).toBe("dev-server");
   expect(roster.panes[1]!.agent).toBeNull();
   expect(roster.panes[1]!.title).toBeNull();
@@ -37,6 +37,21 @@ test("changed_at is set when a status changes and kept while it stays", () => {
   expect(buildRoster(next, memory, 2000, HOME).panes[0]!.changed_at).toBe(2000);
   expect(buildRoster(next, memory, 3000, HOME).panes[0]!.changed_at).toBe(2000);
   expect(buildRoster(next, memory, 3000, HOME).panes[1]!.changed_at).toBeNull();
+});
+
+test("a pane id reused by a new terminal starts over", () => {
+  const memory: StatusMemory = new Map();
+  buildRoster(snapshot, memory, 1000, HOME);
+  const next = structuredClone(snapshot);
+  next.panes[0]!.agent_status = "working";
+  expect(buildRoster(next, memory, 2000, HOME).panes[0]!.changed_at).toBe(2000);
+  next.panes[0]!.terminal_id = "term_b";
+  expect(buildRoster(next, memory, 3000, HOME).panes[0]!.changed_at).toBeNull();
+});
+
+test("opened_at comes from the pane's terminal", () => {
+  const roster = buildRoster(snapshot, new Map(), 1000, HOME, new Map([["term_a", 500]]));
+  expect(roster.panes.map((p) => p.opened_at)).toEqual([500, null, null]);
 });
 
 test("closed panes are forgotten", () => {

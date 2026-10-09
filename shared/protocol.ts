@@ -25,6 +25,8 @@ export interface RosterPane {
   focused: boolean;
   /** ms epoch of the last status change this server saw; null until it sees one */
   changed_at: number | null;
+  /** ms epoch the pane's shell started (from its process); null when it can't be told */
+  opened_at: number | null;
 }
 
 export interface Roster {

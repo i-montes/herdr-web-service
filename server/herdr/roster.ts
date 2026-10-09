@@ -1,12 +1,16 @@
 /**
  * Turns Herdr's `session.snapshot` into the roster the web app draws: workspaces with a display
- * path, and every pane (agent or shell) with its status. Herdr does not report when a status
- * changed, so the server remembers the last status per pane and stamps changes it sees.
+ * path, and every pane (agent or shell) with its status. Herdr reports no times: the server
+ * remembers the last status per pane and stamps changes it sees, and `opened` (lifetimes.ts) says
+ * when each pane's shell started.
  */
 import type { AgentStatus, Roster, RosterPane, RosterWorkspace } from "../../shared/protocol.ts";
 
-/** pane_id → last status seen and when it last changed */
-export type StatusMemory = Map<string, { status: AgentStatus; changed_at: number | null }>;
+/**
+ * pane_id → last status seen and when it last changed. The terminal tells a reused pane id from
+ * the same pane (Herdr numbers panes per workspace).
+ */
+export type StatusMemory = Map<string, { status: AgentStatus; changed_at: number | null; terminal_id: string }>;
 
 type Raw = Record<string, unknown>;
 const STATUSES: readonly AgentStatus[] = ["idle", "working", "blocked", "done", "unknown"];
@@ -31,7 +35,12 @@ function mostCommon(paths: string[]): string {
   return best;
 }
 
-export function buildRoster(snapshot: { workspaces?: unknown; tabs?: unknown; panes?: unknown }, memory: StatusMemory, now: number, home: string): Roster {
+/** the terminal behind a pane, as Herdr's snapshot names it */
+export function terminalOf(pane: unknown): string {
+  return str((pane as Raw | null)?.["terminal_id"]);
+}
+
+export function buildRoster(snapshot: { workspaces?: unknown; tabs?: unknown; panes?: unknown }, memory: StatusMemory, now: number, home: string, opened: ReadonlyMap<string, number | null> = new Map()): Roster {
   const rawPanes = Array.isArray(snapshot.panes) ? (snapshot.panes as Raw[]) : [];
   const tabLabels = new Map<string, string>();
   for (const t of Array.isArray(snapshot.tabs) ? (snapshot.tabs as Raw[]) : []) {
@@ -44,9 +53,11 @@ export function buildRoster(snapshot: { workspaces?: unknown; tabs?: unknown; pa
   const panes: RosterPane[] = rawPanes.map((p) => {
     const pane_id = str(p["pane_id"]);
     const status = STATUSES.includes(p["agent_status"] as AgentStatus) ? (p["agent_status"] as AgentStatus) : "unknown";
-    const before = memory.get(pane_id);
+    const terminal_id = terminalOf(p);
+    const remembered = memory.get(pane_id);
+    const before = remembered?.terminal_id === terminal_id ? remembered : undefined;
     const changed_at = before && before.status !== status ? now : (before?.changed_at ?? null);
-    memory.set(pane_id, { status, changed_at });
+    memory.set(pane_id, { status, changed_at, terminal_id });
     seen.add(pane_id);
     const title = str(p["terminal_title_stripped"]).trim();
     return {
@@ -60,6 +71,7 @@ export function buildRoster(snapshot: { workspaces?: unknown; tabs?: unknown; pa
       cwd: tildePath(str(p["foreground_cwd"] || p["cwd"]), home),
       focused: Boolean(p["focused"]),
       changed_at,
+      opened_at: opened.get(terminal_id) ?? null,
     };
   });
   for (const id of memory.keys()) if (!seen.has(id)) memory.delete(id);

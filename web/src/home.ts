@@ -56,6 +56,46 @@ export function ago(at: number | null, now: number): string | null {
   return d === 1 ? "yesterday" : `${d} days ago`;
 }
 
+/** how long since `at`, for "open 3h 12m" and "working for 4 min"; null when unknown */
+export function elapsed(at: number | null, now: number): string | null {
+  if (at === null) return null;
+  const s = Math.max(0, Math.round((now - at) / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  return h % 24 ? `${d}d ${h % 24}h` : `${d}d`;
+}
+
+/** "open 3h 12m": how long the pane has been open */
+export const openFor = (at: number | null, now: number) => {
+  const span = elapsed(at, now);
+  return span === null ? null : `open ${span}`;
+};
+
+/** the time under a status chip: "for 4 min" while it works or waits, "4 min ago" once it rests */
+export function chipTime(status: AgentStatus): (at: number | null, now: number) => string | null {
+  if (status !== "working" && status !== "blocked") return ago;
+  return (at, now) => {
+    const span = elapsed(at, now);
+    return span === null ? null : `for ${span}`;
+  };
+}
+
+/** a date to hover over: "Oct 9, 08:18" */
+export const longDate = (at: number | null) => (at === null ? undefined : new Date(at).toLocaleString("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }));
+
+/** "Working for 4 min" while it works or waits; null while it rests or the change wasn't seen */
+export function statusSince(status: AgentStatus, changedAt: number | null, now: number): string | null {
+  const span = elapsed(changedAt, now);
+  if (span === null) return null;
+  if (status === "working") return `working for ${span}`;
+  if (status === "blocked") return `waiting for ${span}`;
+  return null;
+}
+
 export interface WorkspaceGroup {
   workspace: RosterWorkspace;
   /** every pane of the workspace (sidebar) */

@@ -40,6 +40,10 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   - `ws.ts` — selectores puros de los WebSocket abiertos (por sesión, caducados).
   - `fsbrowse.ts` — explorador de carpetas de "Nueva sesión" (`GET /api/fs`), limitado al home.
   - `herdr/roster.ts` — `session.snapshot` → roster (workspaces + paneles) que dibuja la web.
+    Herdr no da horas: `herdr/lifetimes.ts` saca cuándo se abrió cada panel (`opened_at`) del
+    `shell_pid` de `pane.process_info` y `ps -o etime` (una vez por `terminal_id`), y guarda la
+    memoria de estados (`changed_at`, "working for 4 min") en `<state dir>/panes.json` para que
+    sobreviva a un reinicio del servidor.
   - `herdr/launch.ts` — crea sesiones (`POST /api/sessions`): pestaña en el workspace de esa
     carpeta o workspace nuevo; arranca shell o agente; el primer mensaje espera a que el agente
     quede `idle` (si no, caería en el aviso de confianza de Claude) y `deliverFirstPrompt` lo

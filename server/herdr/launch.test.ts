@@ -57,7 +57,7 @@ test("a new folder gets a new workspace; an agent starts with its permission mod
     ["tab.rename", { tab_id: "w5:t1", label: "x" }],
     ["agent.start", { name: "x", kind: "claude", pane_id: "w5:p1", args: ["--permission-mode", "plan", "--add-dir", uploadDir()] }],
   ]);
-  const pane = (status: "blocked" | "idle", agent: string | null = "claude") => ({ pane_id: "w5:p1", workspace_id: "w5", tab_id: "t", agent, status, title: null, label: null, cwd: "", focused: false, changed_at: null });
+  const pane = (status: "blocked" | "idle", agent: string | null = "claude") => ({ pane_id: "w5:p1", workspace_id: "w5", tab_id: "t", agent, status, title: null, label: null, cwd: "", focused: false, changed_at: null, opened_at: null });
   expect(readyPrompts({ workspaces: [], panes: [pane("blocked")] })).toEqual([]);
   expect(readyPrompts({ workspaces: [], panes: [pane("idle")] })).toEqual([{ pane_id: "w5:p1", text: "hola" }]);
   expect(readyPrompts({ workspaces: [], panes: [pane("idle")] })).toEqual([]);
@@ -98,7 +98,7 @@ test("a pending message is dropped when its pane closes", () => {
   if (!parsed.ok) throw new Error(parsed.error);
   return launchSession(h, parsed.value, roster, home).then(() => {
     expect(readyPrompts({ workspaces: [], panes: [] })).toEqual([]);
-    expect(readyPrompts({ workspaces: [], panes: [{ pane_id: "w1:p9", workspace_id: "w1", tab_id: "t", agent: "claude", status: "idle", title: null, label: null, cwd: "", focused: false, changed_at: null }] })).toEqual([]);
+    expect(readyPrompts({ workspaces: [], panes: [{ pane_id: "w1:p9", workspace_id: "w1", tab_id: "t", agent: "claude", status: "idle", title: null, label: null, cwd: "", focused: false, changed_at: null, opened_at: null }] })).toEqual([]);
   });
 });
 

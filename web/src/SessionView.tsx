@@ -4,7 +4,8 @@ import { UsageButton } from "./Usage.tsx";
 import { OpencodeControls, OpencodeModelList, OpencodeVariantList, useOpencodeOptions, variantLabel } from "./OpencodeControls.tsx";
 import { AgentTile } from "./AgentTile.tsx";
 import { ApiFailure, api, type PaneKey } from "./api.ts";
-import { agentLook, sessionName } from "./home.ts";
+import { agentLook, longDate, openFor, sessionName, statusSince } from "./home.ts";
+import { Ago } from "./Ago.tsx";
 import { MAX_FONT_PX, fitTerminal, isRule } from "./terminal.ts";
 import { Icon } from "./Home.tsx";
 import { PhoneDialog } from "./OpenOnPhone.tsx";
@@ -58,7 +59,8 @@ export function SessionView({ paneId, roster, loaded, access, onBack }: { paneId
   const look = agentLook(pane?.agent ?? null);
   const title = pane ? sessionName(pane) : paneId;
   const ended = gone || (loaded && !pane);
-  const subtitle = [pane?.cwd ?? workspace?.path ?? "", modelName(model) ?? look.label].filter(Boolean).join(" · ");
+  const where = pane?.cwd ?? workspace?.path ?? "";
+  const agentName = modelName(model) ?? look.label;
 
   const close = async () => {
     try {
@@ -79,7 +81,13 @@ export function SessionView({ paneId, roster, loaded, access, onBack }: { paneId
           <AgentTile agent={pane?.agent ?? null} className="size-9 rounded-[10px] font-mono text-base font-semibold" />
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-[17px] font-bold">{title}</span>
-            <span className="truncate font-mono text-xs text-muted">{subtitle}</span>
+            <span className="truncate font-mono text-xs text-muted">
+              {/* the times first: on a phone the path is the part that gets cut */}
+              {agentName}
+              {!ended && pane?.opened_at != null && <> · <Ago at={pane.opened_at} format={openFor} title={`Opened ${longDate(pane.opened_at)}`} /></>}
+              {!ended && pane && <Ago at={pane.changed_at} format={(at, now) => { const text = statusSince(pane.status, at, now); return text && ` · ${text}`; }} title={`Since ${longDate(pane.changed_at)}`} />}
+              {where && ` · ${where}`}
+            </span>
           </span>
           {!ended && pane?.agent === "claude" && (
             <ModelControls

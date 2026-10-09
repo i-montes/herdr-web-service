@@ -8,7 +8,7 @@ import { OpenOnPhone } from "./OpenOnPhone.tsx";
 import { AlertSettings } from "./AlertSettings.tsx";
 import { DevicesButton } from "./Devices.tsx";
 import { sessionHref } from "./roster.ts";
-import { FILTERS, STATUS_LABEL, BUCKET_OF, agentLook, homeView, plural, sessionName, type Filter, type WorkspaceGroup } from "./home.ts";
+import { FILTERS, STATUS_LABEL, BUCKET_OF, agentLook, chipTime, homeView, longDate, openFor, plural, sessionName, type Filter, type WorkspaceGroup } from "./home.ts";
 import { useTheme } from "./theme.ts";
 
 /** chip and dot classes per status (design: waiting / working / idle) */
@@ -320,7 +320,7 @@ function WaitingCard({ pane, workspace }: { pane: RosterPane; workspace: string 
         <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 font-mono text-[11px] text-accent-soft-ink">{STATUS_LABEL.blocked}</span>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <Ago at={pane.changed_at} className="text-[13px] text-muted" fallback={<span className="text-[13px] text-muted">{pane.cwd}</span>} />
+        <Ago at={pane.changed_at} format={chipTime(pane.status)} title={`Waiting since ${longDate(pane.changed_at)}`} className="text-[13px] text-muted" fallback={<span className="text-[13px] text-muted">{pane.cwd}</span>} />
         <a href={sessionHref(pane.pane_id)} className="flex min-h-11 items-center gap-1.5 rounded-full bg-accent px-[18px] text-[15px] font-semibold text-white lg:min-h-10 lg:text-sm">
           Open
           <Icon d="M5 12h14M13 6l6 6-6 6" size={14} width={2.4} />
@@ -374,14 +374,17 @@ function SessionRow({ pane }: { pane: RosterPane }) {
       <AgentTile agent={pane.agent} className="size-[30px] rounded-lg font-mono text-[13px] font-semibold" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-[15px] font-semibold">{sessionName(pane)}</span>
-        <span className="truncate text-[13px] text-muted">{look.label} · {pane.cwd}</span>
+        <span className="truncate text-[13px] text-muted">
+          {look.label} · {pane.opened_at !== null && <><Ago at={pane.opened_at} format={openFor} title={`Opened ${longDate(pane.opened_at)}`} /> · </>}
+          {pane.cwd}
+        </span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
         <span className={`flex items-center gap-1.5 rounded-full px-2 py-[3px] text-[11px] font-semibold lg:px-2.5 lg:text-xs ${status.chip}`}>
           <span className={`size-1.5 rounded-full ${status.dot}`} />
           {STATUS_LABEL[pane.status]}
         </span>
-        <Ago at={pane.changed_at} className="text-[11px] text-muted lg:text-xs" />
+        <Ago at={pane.changed_at} format={chipTime(pane.status)} title={`Since ${longDate(pane.changed_at)}`} className="text-[11px] text-muted lg:text-xs" />
       </span>
     </a>
   );

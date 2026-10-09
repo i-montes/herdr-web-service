@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import type { Roster, RosterPane } from "../../shared/protocol.ts";
-import { agentLook, ago, homeView, sessionName } from "./home.ts";
+import { agentLook, ago, chipTime, elapsed, homeView, openFor, sessionName, statusSince } from "./home.ts";
 
 const pane = (over: Partial<RosterPane>): RosterPane => ({
-  pane_id: "p", workspace_id: "w1", tab_id: "t", agent: "claude", status: "idle", title: null, label: null, cwd: "~/p/app", focused: false, changed_at: null, ...over,
+  pane_id: "p", workspace_id: "w1", tab_id: "t", agent: "claude", status: "idle", title: null, label: null, cwd: "~/p/app", focused: false, changed_at: null, opened_at: null, ...over,
 });
 
 const roster: Roster = {
@@ -50,4 +50,22 @@ test("ago", () => {
   expect(ago(now - 120_000, now)).toBe("2 min ago");
   expect(ago(now - 3 * 3_600_000, now)).toBe("3h ago");
   expect(ago(now - 30 * 3_600_000, now)).toBe("yesterday");
+});
+
+test("elapsed, open and status times", () => {
+  const now = 10 * 86_400_000;
+  expect(elapsed(null, now)).toBeNull();
+  expect(elapsed(now - 42_000, now)).toBe("42s");
+  expect(elapsed(now - 12 * 60_000, now)).toBe("12 min");
+  expect(elapsed(now - 3 * 3_600_000, now)).toBe("3h");
+  expect(elapsed(now - (3 * 60 + 12) * 60_000, now)).toBe("3h 12m");
+  expect(elapsed(now - 2 * 86_400_000 - 4 * 3_600_000, now)).toBe("2d 4h");
+  expect(elapsed(now + 5_000, now)).toBe("0s");
+  expect(openFor(now - 3 * 3_600_000, now)).toBe("open 3h");
+  expect(statusSince("working", now - 4 * 60_000, now)).toBe("working for 4 min");
+  expect(statusSince("blocked", now - 4 * 60_000, now)).toBe("waiting for 4 min");
+  expect(statusSince("idle", now - 4 * 60_000, now)).toBeNull();
+  expect(statusSince("working", null, now)).toBeNull();
+  expect(chipTime("working")(now - 4 * 60_000, now)).toBe("for 4 min");
+  expect(chipTime("done")(now - 4 * 60_000, now)).toBe("4 min ago");
 });

@@ -19,7 +19,7 @@ computer, on your home network or on a VPS, and installs with a single command.
 ## Features
 
 - **All your Herdr sessions in one list**, grouped by workspace, with their state (working,
-  waiting for you, done) and filters.
+  waiting for you, done), how long each has been open and working, and filters.
 - **Chat with Claude Code and OpenCode**: messages, the tools they run, diffs of what they edit,
   plans and questions. Agent menus (permissions, questions, `/model`, `/effort`) are answered
   from the chat.
@@ -199,7 +199,7 @@ herdr plugin uninstall imontes.herdr-web-service
   (`.env`, `auth.json`, `vapid.json` with the push keys, and `claude-statusline.json` if you had
   another status line).
 - State and log: `~/.local/state/herdr/plugins/imontes.herdr-web-service/`
-  (`sessions.json`, `push.json`, `server.log`, `claude-status/`).
+  (`sessions.json`, `push.json`, `panes.json`, `server.log`, `claude-status/`).
 - If Herdr sets `HERDR_PLUGIN_CONFIG_DIR` and `HERDR_PLUGIN_STATE_DIR`, those paths are used.
 
 ## Development

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { AgentStatus, Roster, RosterPane } from "../shared/protocol.ts";
 import { NoticeWatch } from "./notify.ts";
 
-const pane = (pane_id: string, status: AgentStatus, extra: Partial<RosterPane> = {}): RosterPane => ({ pane_id, workspace_id: "w1", tab_id: "t", agent: "claude", status, title: null, label: "fix-discount", cwd: "~/shop", focused: false, changed_at: null, ...extra });
+const pane = (pane_id: string, status: AgentStatus, extra: Partial<RosterPane> = {}): RosterPane => ({ pane_id, workspace_id: "w1", tab_id: "t", agent: "claude", status, title: null, label: "fix-discount", cwd: "~/shop", focused: false, changed_at: null, opened_at: null, ...extra });
 const roster = (...panes: RosterPane[]): Roster => ({ workspaces: [{ workspace_id: "w1", number: 1, label: "storefront", path: "~/shop", focused: false }], panes });
 
 test("the first roster is only the baseline", () => {

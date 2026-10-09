@@ -18,7 +18,8 @@ import { PUBLIC_ID_LENGTH, deviceName, publicId } from "./auth/devices.ts";
 import { clientAddress, factsFrom, hostAllowed, isSecure, loginTransportAllowed, originAllowed, securityHeaders, type AccessConfig, type RequestFacts } from "./access.ts";
 import { STATE_DIR, config } from "./config.ts";
 import { HerdrClient, HerdrError } from "./herdr/client.ts";
-import { buildRoster, type StatusMemory } from "./herdr/roster.ts";
+import { buildRoster } from "./herdr/roster.ts";
+import { PaneLifetimes, loadStatusMemory, saveStatusMemory } from "./herdr/lifetimes.ts";
 import { deliverFirstPrompt, launchSession, parseNewSession, readyPrompts } from "./herdr/launch.ts";
 import { paneIdFrom, parsePaneInput } from "./herdr/panes.ts";
 import { listDirs } from "./fsbrowse.ts";
@@ -37,11 +38,16 @@ import { sendPush } from "./push/webpush.ts";
 const herdr = new HerdrClient(config.herdrSocket);
 const access: AccessConfig = { mode: config.accessMode, publicUrl: config.publicUrl, host: config.host, port: config.port, devOrigin: config.devOrigin };
 
-const statusMemory: StatusMemory = new Map();
+const statusMemory = loadStatusMemory(STATE_DIR);
+const lifetimes = new PaneLifetimes();
 
 async function loadRoster(): Promise<Roster> {
   const result = await herdr.request<{ snapshot: { workspaces?: unknown; tabs?: unknown; panes?: unknown } }>("session.snapshot");
-  return buildRoster(result.snapshot ?? {}, statusMemory, Date.now(), homedir());
+  const snapshot = result.snapshot ?? {};
+  await lifetimes.update(herdr, Array.isArray(snapshot.panes) ? snapshot.panes : []);
+  const roster = buildRoster(snapshot, statusMemory, Date.now(), homedir(), lifetimes.opened);
+  saveStatusMemory(STATE_DIR, statusMemory);
+  return roster;
 }
 
 // --- live roster: one Herdr subscription fans out to every browser -------------------------

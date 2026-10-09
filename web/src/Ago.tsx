@@ -3,9 +3,10 @@ import { ago } from "./home.ts";
 
 /**
  * "12s ago" that keeps counting by itself: ticks every second during the first minute,
- * then every 15 s, so each label stays current without re-rendering the page.
+ * then every 15 s, so each label stays current without re-rendering the page. `format` changes
+ * the wording ("open 3h", "working for 4 min"); returning null shows the fallback.
  */
-export function Ago({ at, className, fallback = null }: { at: number | null; className?: string; fallback?: React.ReactNode }) {
+export function Ago({ at, className, fallback = null, format = ago, title }: { at: number | null; className?: string; fallback?: React.ReactNode; format?: (at: number | null, now: number) => string | null; title?: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (at === null) return;
@@ -18,10 +19,10 @@ export function Ago({ at, className, fallback = null }: { at: number | null; cla
     tick();
     return () => clearTimeout(timer);
   }, [at]);
-  const text = ago(at, now);
+  const text = format(at, now);
   if (text === null) return <>{fallback}</>;
   return (
-    <time dateTime={new Date(at!).toISOString()} className={className}>
+    <time dateTime={new Date(at!).toISOString()} className={className} title={title}>
       {text}
     </time>
   );
