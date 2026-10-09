@@ -25,7 +25,7 @@ import { locateTranscript, readChat } from "./chat/store.ts";
 import { keysToChoose, parsePrompt } from "./chat/prompt.ts";
 import { locateOpencodeSession, opencodeDb, readOpencodeChat } from "./chat/opencode.ts";
 import { readClaudeStatus } from "./chat/usage.ts";
-import { opencodeCatalog, opencodeUsage, opencodeVariants, recentOpencodeModels, setOpencodeModel, setOpencodeVariant } from "./chat/opencode-controls.ts";
+import { opencodeCatalog, opencodeUsage, opencodeVariants, parseOpencodeFooter, recentOpencodeModels, setOpencodeModel, setOpencodeVariant } from "./chat/opencode-controls.ts";
 import { apiError, isRegularFile, json, withHeaders } from "./http.ts";
 import { socketsOfSession, staleSockets } from "./ws.ts";
 
@@ -225,11 +225,16 @@ async function opencodeOptions(paneId: string): Promise<{ models: ReturnType<typ
   const last = session
     ? (db.query("select json_extract(data,'$.providerID') p, json_extract(data,'$.modelID') m, json_extract(data,'$.variant') v from message where session_id = ? and json_extract(data,'$.role') = 'assistant' order by time_created desc limit 1").get(session.id) as { p: string; m: string; v: string | null } | null)
     : null;
-  const current = last ?? (models[0] ? { p: models[0].provider, m: models[0].model, v: null } : null);
+  // the prompt's footer is the live state: the last message lags behind a ctrl+t, and a new
+  // session has none yet. It names the model with its provider: "MiniMax-M3 MiniMax (minimax.io)"
+  const screen = await herdr.request<{ read: { text: string } }>("pane.read", { pane_id: paneId, source: "visible", strip_ansi: true }).catch(() => null);
+  const footer = screen ? parseOpencodeFooter(screen.read.text) : null;
+  const shown = footer ? models.find((m) => footer.model === m.name || footer.model.startsWith(`${m.name} `)) : undefined;
+  const current = shown ? { p: shown.provider, m: shown.model, v: footer!.variant } : (last ?? (models[0] ? { p: models[0].provider, m: models[0].model, v: null } : null));
   return {
     models,
     variants: current ? opencodeVariants(catalog, current.p, current.m) : [null],
-    current: { model: current?.m ?? null, variant: current?.v ?? null },
+    current: { model: current?.m ?? null, variant: footer ? footer.variant : (current?.v ?? null) },
   };
 }
 

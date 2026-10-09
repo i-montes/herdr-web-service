@@ -70,7 +70,9 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
     catálogo `~/.cache/opencode/models.json`, coste de sesión y de 7 días). Su diálogo de modelos
     no se puede leer (la fila elegida solo se marca con color): la web ofrece los modelos recientes
     y el servidor escribe `/models`, busca el nombre y pulsa Enter; la variante se cambia con
-    `ctrl+t` hasta que el pie del prompt la muestra. Ctrl+C cierra OpenCode: no usarlo.
+    `ctrl+t` hasta que el pie del prompt la muestra. El modelo y la variante actuales también se leen
+    de ese pie (el último mensaje de la base se queda atrás tras un `ctrl+t` y una sesión nueva no
+    tiene). Ctrl+C cierra OpenCode: no usarlo.
   - `uploads.ts` — imágenes del chat (`POST /api/uploads`, `GET /api/uploads/<nombre>`): solo PNG,
     JPEG, GIF y WebP reconocidos por sus bytes, hasta 10 MB, nombre aleatorio, en
     `<tmpdir>/herdr-web-uploads` (el sistema la limpia; el servidor borra lo de más de 7 días).
@@ -84,7 +86,8 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   "Herdr Web — Sistema visual": colores como variables en `index.css` (utilidades `bg-canvas`,
   `text-ink`…; claro/oscuro por sistema o `data-theme`, ver `theme.ts`), fuentes servidas en local.
   Pantallas: `Login.tsx`, `Home.tsx` (Inicio), `NewSession.tsx` (diálogo), `SessionView.tsx`
-  (terminal). Rutas por hash: `#/` y `#/session/<pane>` (acepta también el antiguo `#/sesion/`).
+  (terminal; en escritorio la cabecera lleva modelo y esfuerzo, en móvil están en el menú ⋯).
+  Rutas por hash: `#/` y `#/session/<pane>` (acepta también el antiguo `#/sesion/`).
   PWA: `web/public/` (manifiesto, `sw.js` que nunca cachea `/api` ni `/ws`, iconos). El service
   worker solo se registra en HTTPS o localhost. `OpenOnPhone.tsx`: QR "Abrir en el móvil", solo
   en escritorio, con la URL de `PUBLIC_URL` (en modo local explica que el móvil no llega).

@@ -1,7 +1,7 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
 import type { AgentUsage, Roster, SessionInfo } from "../../shared/protocol.ts";
 import { UsageButton } from "./Usage.tsx";
-import { OpencodeControls } from "./OpencodeControls.tsx";
+import { OpencodeControls, OpencodeModelList, OpencodeVariantList, useOpencodeOptions, variantLabel } from "./OpencodeControls.tsx";
 import { AgentTile } from "./AgentTile.tsx";
 import { ApiFailure, api, type PaneKey } from "./api.ts";
 import { agentLook, sessionName } from "./home.ts";
@@ -91,7 +91,30 @@ export function SessionView({ paneId, roster, loaded, access, onBack }: { paneId
           )}
           {!ended && pane?.agent === "opencode" && <OpencodeControls paneId={paneId} busy={pane.status !== "idle" && pane.status !== "done"} />}
           {!ended && usage && <UsageButton usage={usage} />}
-          {!ended && <SessionMenu access={access} onClose={close} />}
+          {!ended && (
+            <SessionMenu
+              access={access}
+              onClose={close}
+              // on a phone the header has no room for the model and effort buttons: they live here
+              agentItems={(dismiss, item) =>
+                pane?.agent === "claude" ? (
+                  <ClaudeMenuItems
+                    model={usage?.model ?? modelName(model)}
+                    effort={usage?.effort ?? null}
+                    busy={pane.status !== "idle" && pane.status !== "done"}
+                    menuOpen={menuOpen}
+                    item={item}
+                    onCommand={(command) => {
+                      dismiss();
+                      void api.prompt(paneId, command).catch(() => {});
+                    }}
+                  />
+                ) : pane?.agent === "opencode" ? (
+                  <OpencodeMenuItems paneId={paneId} busy={pane.status !== "idle" && pane.status !== "done"} item={item} onDone={dismiss} />
+                ) : null
+              }
+            />
+          )}
         </div>
       </header>
 
@@ -185,8 +208,72 @@ function ModelControls({ model, effort, busy, menuOpen, onCommand }: {
   );
 }
 
+const MODEL_ICON = "M9 3v2M15 3v2M9 19v2M15 19v2M3 9h2M3 15h2M19 9h2M19 15h2M7 7h10v10H7z";
+const EFFORT_ICON = "M4 18a8 8 0 1 1 16 0M12 14l4-4";
+
+/** a menu row: icon, what it changes, and its current value */
+function MenuRow({ icon, label, value, disabled, onClick, item }: { icon: string; label: string; value: string; disabled: boolean; onClick: () => void; item: string }) {
+  return (
+    <button type="button" role="menuitem" disabled={disabled} onClick={onClick} className={`${item} disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
+      <Icon d={icon} size={16} className="text-muted" />
+      <span className="flex-1">{label}</span>
+      <span className="max-w-[45%] truncate text-sm text-muted">{value}</span>
+    </button>
+  );
+}
+
+/**
+ * Phone: Claude's model and effort in the "⋯" menu. Like the desktop buttons, each types /model or
+ * /effort and the chat shows Claude Code's own menu as a card; only while Claude is at rest.
+ */
+function ClaudeMenuItems({ model, effort, busy, menuOpen, item, onCommand }: { model: string | null; effort: string | null; busy: boolean; menuOpen: boolean; item: string; onCommand: (command: string) => void }) {
+  const why = busy ? "Available when Claude is ready" : menuOpen ? "Pick from the menu in the chat" : null;
+  return (
+    <>
+      <MenuRow icon={MODEL_ICON} label="Model" value={model ?? "—"} disabled={!!why} onClick={() => onCommand("/model")} item={item} />
+      <MenuRow icon={EFFORT_ICON} label="Effort" value={effort ?? "—"} disabled={!!why} onClick={() => onCommand("/effort")} item={item} />
+      {why && <p className="px-3 pb-1 text-xs text-muted">{why}</p>}
+    </>
+  );
+}
+
+/** Phone: OpenCode's model and variant in the "⋯" menu; each opens its list in place. */
+function OpencodeMenuItems({ paneId, busy, item, onDone }: { paneId: string; busy: boolean; item: string; onDone: () => void }) {
+  const { options, working, error, setModel, setVariant, modelLabel } = useOpencodeOptions(paneId, busy);
+  const [list, setList] = useState<"model" | "variant" | null>(null);
+  if (!options || options.models.length === 0) return null;
+  const why = busy ? "Available when OpenCode is ready" : working ? "Applying…" : null;
+  // the menu stays open while OpenCode applies the change, and closes once it took it
+  const pick = async (change: () => Promise<boolean>) => {
+    setList(null);
+    if (await change()) onDone();
+  };
+  if (list) {
+    return (
+      <>
+        <button type="button" onClick={() => setList(null)} className={`${item} font-semibold`}>
+          <Icon d="M15 6l-6 6 6 6" size={16} className="text-muted" />
+          {list === "model" ? "Model" : "Effort"}
+        </button>
+        {list === "model" ? (
+          <OpencodeModelList options={options} item={item} onPick={(provider, model) => void pick(() => setModel(provider, model))} />
+        ) : (
+          <OpencodeVariantList options={options} item={item} onPick={(v) => void pick(() => setVariant(v))} />
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      <MenuRow icon={MODEL_ICON} label="Model" value={working ? "Applying…" : modelLabel} disabled={!!why} onClick={() => setList("model")} item={item} />
+      <MenuRow icon={EFFORT_ICON} label="Effort" value={variantLabel(options.current.variant)} disabled={!!why || options.variants.length < 2} onClick={() => setList("variant")} item={item} />
+      {(error ?? why) && <p className={`px-3 pb-1 text-xs ${error ? "text-danger-ink" : "text-muted"}`}>{error ?? why}</p>}
+    </>
+  );
+}
+
 /** "⋯": the actions that need not take header room (open on phone, close the session) */
-function SessionMenu({ access, onClose }: { access: SessionInfo["access"]; onClose: () => void }) {
+function SessionMenu({ access, onClose, agentItems }: { access: SessionInfo["access"]; onClose: () => void; agentItems?: (dismiss: () => void, item: string) => ReactNode }) {
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [phone, setPhone] = useState(false);
@@ -225,7 +312,10 @@ function SessionMenu({ access, onClose }: { access: SessionInfo["access"]; onClo
         </svg>
       </button>
       {open && (
-        <div role="menu" className="absolute top-12 right-0 z-30 flex w-64 flex-col gap-0.5 rounded-2xl border border-line bg-surface p-1.5 shadow-dialog">
+        <div role="menu" className="absolute top-12 right-0 z-30 flex max-h-[75dvh] w-72 flex-col gap-0.5 overflow-y-auto rounded-2xl border border-line bg-surface p-1.5 shadow-dialog">
+          {agentItems && (
+            <div className="flex flex-col gap-0.5 border-b border-line pb-1.5 mb-1 empty:hidden lg:hidden">{agentItems(() => setOpen(false), item)}</div>
+          )}
           <button
             type="button"
             role="menuitem"
