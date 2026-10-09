@@ -1,0 +1,127 @@
+# herdr-web-service
+
+Plugin de Herdr: cliente web tipo chat para los agentes, con login propio y HTTPS, pensado para
+un VPS público e instalable con `herdr plugin install` sin pasos manuales.
+
+## Comandos
+
+```
+bun install              # deps
+bun run dev              # servidor (watch) + Vite con proxy a /api y /ws
+bun run build            # web → dist/ (lo sirve el servidor Bun)
+bun run typecheck
+bun test
+bun scripts/plugin.ts start|stop|status|setup|set-password|uninstall|url
+```
+
+`bun run dev` arranca el servidor con `DEV_ORIGIN=http://localhost:5173` (el origen de Vite pasa
+la política de Origin). `set-password` no recibe argumentos: pide la password sin eco (o lee una
+línea de un pipe).
+
+Verbos de `scripts/plugin.ts`: `start` (usa la unidad de servicio si existe; si no, servidor
+suelto con pid en el state dir), `stop`, `status`, `setup` (asistente), `set-password`,
+`uninstall` (quita túnel y unidades; conserva `auth.json` y `.env`), `url`.
+
+Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`.
+`herdr plugin link` no ejecuta `[[build]]`: tras cambios en `web/` hay que `bun run build`.
+
+## Estructura
+
+- `herdr-plugin.toml` — manifiesto (build, startup, acciones, pane popup `setup`).
+- `server/` — `Bun.serve`: `index.ts` (rutas, WS, fan-out), `herdr/client.ts` (NDJSON sobre el
+  socket Unix de Herdr), `config.ts` (dirs y `.env` del plugin).
+  - `access.ts` — política por petición (funciones puras sobre `RequestFacts`): proxy de
+    confianza, Host/Origin, transporte del login, cabeceras de seguridad. No importa `config.ts`.
+  - `ws.ts` — selectores puros de los WebSocket abiertos (por sesión, caducados).
+  - `fsbrowse.ts` — explorador de carpetas de "Nueva sesión" (`GET /api/fs`), limitado al home.
+  - `herdr/roster.ts` — `session.snapshot` → roster (workspaces + paneles) que dibuja la web.
+  - `herdr/launch.ts` — crea sesiones (`POST /api/sessions`): pestaña en el workspace de esa
+    carpeta o workspace nuevo; arranca shell o agente; el primer mensaje espera a que el agente
+    quede `idle` (si no, caería en el aviso de confianza de Claude).
+  - `chat/` — chat de Claude Code (`GET /api/panes/:id/chat?v=`, `POST …/prompt`, `POST …/choose`):
+    `store.ts` localiza el transcript (el `agent_session` que reporta la integración de Herdr
+    —`herdr integration install claude`, hook `SessionStart`— o, si falta, el JSONL más reciente
+    de la carpeta) solo dentro de `~/.claude/projects` y lo lee por incrementos; `transcript.ts`
+    lo convierte en mensajes, herramientas, diffs, plan y preguntas; `prompt.ts` lee de la
+    pantalla el menú que espera el agente (permisos, preguntas, /model, el deslizador de /effort)
+    y lo responde con flechas + Enter. Los comandos de barra se escriben con `pane.send_input`
+    (`agent.prompt` los rechaza). `opencode.ts` lee las sesiones de OpenCode de su SQLite
+    (`~/.local/share/opencode/opencode.db`, solo lectura); su integración de Herdr reporta el
+    `ses_…` de cada panel.
+    `usage.ts`: contexto y límites del plan (5 h y semana, con su reinicio) de Claude Code. Los
+    entrega a su status line: `scripts/statusline.ts` (registrado en `~/.claude/settings.json` →
+    `statusLine`) los guarda en `<state dir>/claude-status/<session_id>.json` y pinta
+    `ctx 62% · 5h 34% · sem 12%` al pie de la terminal.
+    `opencode-controls.ts`: modelo y variante (esfuerzo) de OpenCode y su uso (contexto % con el
+    catálogo `~/.cache/opencode/models.json`, coste de sesión y de 7 días). Su diálogo de modelos
+    no se puede leer (la fila elegida solo se marca con color): la web ofrece los modelos recientes
+    y el servidor escribe `/models`, busca el nombre y pulsa Enter; la variante se cambia con
+    `ctrl+t` hasta que el pie del prompt la muestra. Ctrl+C cierra OpenCode: no usarlo.
+  - `uploads.ts` — imágenes del chat (`POST /api/uploads`, `GET /api/uploads/<nombre>`): solo PNG,
+    JPEG, GIF y WebP reconocidos por sus bytes, hasta 10 MB, nombre aleatorio, en
+    `<tmpdir>/herdr-web-uploads` (el sistema la limpia; el servidor borra lo de más de 7 días).
+    El mensaje lleva `[imagen: <ruta>]` y el agente la lee; Claude arranca con `--add-dir` de esa
+    carpeta para no pedir permiso.
+  - `herdr/panes.ts` — vista de terminal: `GET /api/panes/:id/screen`, `POST …/input` (texto y
+    teclas de una lista blanca), `POST …/close`.
+  - `auth/` — `password.ts` (argon2id), `sessions.ts` (sesiones con hash), `ratelimit.ts`
+    (límite de login, módulo puro), `login.ts` (`POST /api/auth/login`).
+- `web/` — Vite + React 19 + Tailwind 4. Build a `dist/`. Sigue el canvas de Claude Design
+  "Herdr Web — Sistema visual": colores como variables en `index.css` (utilidades `bg-canvas`,
+  `text-ink`…; claro/oscuro por sistema o `data-theme`, ver `theme.ts`), fuentes servidas en local.
+  Pantallas: `Login.tsx`, `Home.tsx` (Inicio), `NewSession.tsx` (diálogo), `SessionView.tsx`
+  (terminal). Rutas por hash: `#/` y `#/sesion/<pane>`.
+  PWA: `web/public/` (manifiesto, `sw.js` que nunca cachea `/api` ni `/ws`, iconos). El service
+  worker solo se registra en HTTPS o localhost. `OpenOnPhone.tsx`: QR "Abrir en el móvil", solo
+  en escritorio, con la URL de `PUBLIC_URL` (en modo local explica que el móvil no llega).
+- `shared/protocol.ts` — tipos compartidos servidor/cliente.
+- `scripts/plugin.ts` — control (start/stop/status/setup/set-password/url/uninstall); único
+  entrypoint de las acciones. `scripts/tui.ts` — prompts de terminal.
+- `scripts/setup/` — asistente de `setup`: `wizard.ts` (flujo; todo efecto entra por `WizardDeps`
+  para probarlo con fakes), `preflight.ts`, `env.ts` (lee/escribe `.env`), `network.ts` (IP LAN y
+  URL canónica), `password.ts`, `service.ts` (unidades `systemd --user` / LaunchAgent: `server`
+  y `tunnel`), `loose.ts` (servidor suelto), `verify.ts` (health), `summary.ts` (URL, QR,
+  límites del modo), `uninstall.ts`.
+- `scripts/setup/tunnel/` — `index.ts` (`setupTunnel`/`teardownTunnel`/`funnelServes`),
+  `tailscale.ts` (Funnel), `portal.ts` (Portal; corre como unidad `tunnel`), `run.ts` (runner de
+  procesos inyectable).
+- `tests/pty.py` — prueba el asistente en un pty (solo desarrollo).
+- `docs/RESEARCH.md` — comparativa de los plugins existentes y decisiones de diseño.
+
+## Reglas
+
+- Solo Bun (nada de Node). TypeScript estricto, `verbatimModuleSyntax`, imports con `.ts`.
+- Estado del usuario en `HERDR_PLUGIN_CONFIG_DIR` (`.env`, `auth.json`) y runtime en
+  `HERDR_PLUGIN_STATE_DIR` (pid, sesiones, log). Nunca en el root del plugin.
+- La password solo se fija desde el host, nunca por HTTP. Todo `/api/*` y `/ws` salvo
+  `health`, `session` y `login` exige sesión.
+- `.env` (en `HERDR_PLUGIN_CONFIG_DIR`, escrito por `setup`; el entorno del proceso manda):
+  `ACCESS_MODE` (`local`|`lan`|`remote`, por defecto `local`), `HOST` (por defecto `127.0.0.1`;
+  en `lan` la IP de red), `PORT` (por defecto 7340), `PUBLIC_URL` (URL canónica: cookies, QR,
+  Host/Origin permitidos), `TUNNEL` (`tailscale`|`portal`, solo en remote; también marca un Funnel
+  a medio configurar), `DEV_ORIGIN` (Origin extra para Vite; lo pone `bun run dev`).
+- Reglas de seguridad que aplica el servidor (H1–H9):
+  - H1 `X-Forwarded-For/Proto` solo se confían si el peer TCP es loopback.
+  - H2 login: remote exige HTTPS, lan acepta HTTP, local solo desde loopback.
+  - H3 `Host` debe ser localhost/loopback, el de `PUBLIC_URL` o (lan) el `HOST`.
+  - H4 `Origin` presente debe coincidir exacto con uno permitido; exigido en métodos no GET/HEAD y en `/ws`.
+  - H5 `sessions.json` guarda solo el SHA-256 del token; la cookie lleva el token.
+  - H6 límite de login: 5 fallos libres y backoff 1 s, 2 s, 4 s... hasta 15 min; IPv6 por /64;
+    ventana global de 50 fallos en 10 min frena a toda dirección no admitida (admitida = acertó
+    la password en los últimos 30 días).
+  - H7 `/api/session` sin sesión solo da `authenticated` y `setup_required`; `herdr.connected`
+    solo con sesión.
+  - H8 CSP, `nosniff`, `Referrer-Policy: no-referrer` en todo; HSTS en HTTPS.
+  - H9 sesión: 30 días inactiva, 180 absoluta. Un WebSocket se cierra (1008) al cerrar sesión y,
+    cada 60 s, si su sesión ya no vive.
+- Probar el asistente: `python3 -I tests/pty.py setup <teclas...>` (envía cada tecla con pausa;
+  imprime código de salida y la cola de la salida). Usa siempre `HERDR_PLUGIN_CONFIG_DIR` y
+  `HERDR_PLUGIN_STATE_DIR` temporales (y un `HOME` temporal si llegara a instalar unidades) para
+  no tocar la configuración ni los servicios reales. Los tests unitarios (`bun test`) cubren el
+  flujo con fakes.
+- Herdr cierra la conexión tras cada respuesta: `HerdrClient.request` abre una por petición.
+  `pane.agent_status_changed` exige `pane_id` (no va en la suscripción global; `pane.updated`
+  ya trae el estado).
+- Llamadas a Herdr: socket directo para request/response y suscripciones; `HERDR_BIN_PATH` para
+  comandos que el CLI envuelve mejor (attach de terminal).
+- Textos de UI en español; código y comentarios en inglés.

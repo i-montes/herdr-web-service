@@ -1,0 +1,267 @@
+@import "tailwindcss";
+@import "@fontsource-variable/bricolage-grotesque/opsz.css";
+@import "@fontsource-variable/jetbrains-mono/index.css";
+
+/* `dark:` follows the same rule as the tokens: the system, unless data-theme picks one */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+}
+
+/* Herdr Web visual system (Claude Design canvas "Herdr Web — Sistema visual"). */
+:root {
+  color-scheme: light;
+  --hw-canvas: #f3f1ea;
+  --hw-surface: #ffffff;
+  --hw-sunken: #eae7de;
+  --hw-field: #ffffff;
+  --hw-line: #dad6ca;
+  --hw-ink: #16161a;
+  --hw-muted: #66645c;
+  --hw-accent: #2f45e6;
+  --hw-accent-ink: #2f45e6;
+  --hw-focus: rgb(47 69 230 / 0.16);
+  --hw-ok: #e3f1e7;
+  --hw-ok-ink: #14532d;
+  --hw-danger-ink: #8f1c22;
+  --hw-danger-line: #c0262d;
+  --hw-well: #f3f1ea;
+  --hw-line-soft: #eae7de;
+  --hw-accent-soft: #e4e8fd;
+  --hw-accent-soft-ink: #1e2fb0;
+  --hw-ok-dot: #15803d;
+  --hw-idle: #eae7de;
+  --hw-idle-dot: #8c897f;
+  --hw-inverse: #16161a;
+  --hw-inverse-ink: #f3f1ea;
+  --hw-scrim: rgb(22 22 26 / 0.4);
+  --hw-drawer-shadow: 12px 0 40px rgb(22 22 26 / 0.18);
+  --hw-fab-shadow: 0 8px 24px rgb(47 69 230 / 0.28);
+  --hw-claude: #c15f3c;
+  --hw-claude-ink: #ffffff;
+  --hw-codex: #0f766e;
+  --hw-codex-ink: #ffffff;
+  --hw-opencode: #7c3aed;
+  --hw-opencode-ink: #ffffff;
+  --hw-inset: #f6f4ee;
+  --hw-foot: #faf9f5;
+  --hw-danger: #fbe4e2;
+  --hw-term: #16161a;
+  --hw-term-line: #16161a;
+  --hw-dialog-shadow: 0 30px 80px rgb(22 22 26 / 0.25);
+  --hw-dialog-scrim: rgb(22 22 26 / 0.45);
+  --hw-tool: #fdede4;
+  --hw-tool-ink: #9a3412;
+  --hw-ask: #fff7f1;
+  --hw-ask-line: #f2c9ae;
+  --hw-stream: #fbfaf6;
+  --hw-question-alt: #3a50ec;
+  --hw-question-line: #6f80f0;
+  --hw-question-tile: #24359f;
+  --hw-question-soft: #d3d9ff;
+  --hw-ink-soft: #2a2925;
+}
+
+/* dark: follows the system unless the viewer picked a theme (data-theme on <html>, see theme.ts) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --hw-canvas: #141412;
+    --hw-surface: #1d1c19;
+    --hw-sunken: #262521;
+    --hw-field: #141412;
+    --hw-line: #34322d;
+    --hw-ink: #f3f1ea;
+    --hw-muted: #a8a59b;
+    --hw-accent: #4a5eff;
+    --hw-accent-ink: #8e9bff;
+    --hw-focus: rgb(142 155 255 / 0.25);
+    --hw-ok: #15291c;
+    --hw-ok-ink: #86efac;
+    --hw-danger-ink: #fca5a5;
+    --hw-danger-line: #f87171;
+    --hw-well: #262521;
+    --hw-line-soft: #2a2925;
+    --hw-accent-soft: #1e2350;
+    --hw-accent-soft-ink: #b4beff;
+    --hw-ok-dot: #4ade80;
+    --hw-idle: #262521;
+    --hw-idle-dot: #8c897f;
+    --hw-inverse: #f3f1ea;
+    --hw-inverse-ink: #141412;
+    --hw-scrim: rgb(0 0 0 / 0.55);
+    --hw-drawer-shadow: 12px 0 40px rgb(0 0 0 / 0.5);
+    --hw-fab-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+    --hw-claude: #e07a55;
+    --hw-claude-ink: #1f0d06;
+    --hw-codex: #2dd4bf;
+    --hw-codex-ink: #042f2a;
+    --hw-opencode: #a78bfa;
+    --hw-opencode-ink: #1e0b4a;
+  --hw-inset: #262521;
+  --hw-foot: #191816;
+  --hw-danger: #3a1b1c;
+  --hw-term: #0c0c0b;
+  --hw-term-line: #34322d;
+  --hw-dialog-shadow: 0 30px 80px rgb(0 0 0 / 0.6);
+  --hw-dialog-scrim: rgb(0 0 0 / 0.6);
+  --hw-tool: #3a2216;
+  --hw-tool-ink: #fdba8c;
+  --hw-ask: #2a1d14;
+  --hw-ask-line: #5a3a26;
+  --hw-stream: #191816;
+  --hw-question-alt: #3a50ec;
+  --hw-question-line: #6f80f0;
+  --hw-question-tile: #24359f;
+  --hw-question-soft: #d3d9ff;
+  --hw-ink-soft: #e2dfd6;
+    --hw-inset: #262521;
+    --hw-foot: #191816;
+    --hw-danger: #3a1b1c;
+    --hw-term: #0c0c0b;
+    --hw-term-line: #34322d;
+    --hw-dialog-shadow: 0 30px 80px rgb(0 0 0 / 0.6);
+    --hw-dialog-scrim: rgb(0 0 0 / 0.6);
+    --hw-tool: #3a2216;
+    --hw-tool-ink: #fdba8c;
+    --hw-ask: #2a1d14;
+    --hw-ask-line: #5a3a26;
+    --hw-stream: #191816;
+    --hw-question-alt: #3a50ec;
+    --hw-question-line: #6f80f0;
+    --hw-question-tile: #24359f;
+    --hw-question-soft: #d3d9ff;
+    --hw-ink-soft: #e2dfd6;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --hw-canvas: #141412;
+  --hw-surface: #1d1c19;
+  --hw-sunken: #262521;
+  --hw-field: #141412;
+  --hw-line: #34322d;
+  --hw-ink: #f3f1ea;
+  --hw-muted: #a8a59b;
+  --hw-accent: #4a5eff;
+  --hw-accent-ink: #8e9bff;
+  --hw-focus: rgb(142 155 255 / 0.25);
+  --hw-ok: #15291c;
+  --hw-ok-ink: #86efac;
+  --hw-danger-ink: #fca5a5;
+  --hw-danger-line: #f87171;
+  --hw-well: #262521;
+  --hw-line-soft: #2a2925;
+  --hw-accent-soft: #1e2350;
+  --hw-accent-soft-ink: #b4beff;
+  --hw-ok-dot: #4ade80;
+  --hw-idle: #262521;
+  --hw-idle-dot: #8c897f;
+  --hw-inverse: #f3f1ea;
+  --hw-inverse-ink: #141412;
+  --hw-scrim: rgb(0 0 0 / 0.55);
+  --hw-drawer-shadow: 12px 0 40px rgb(0 0 0 / 0.5);
+  --hw-fab-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+  --hw-claude: #e07a55;
+  --hw-claude-ink: #1f0d06;
+  --hw-codex: #2dd4bf;
+  --hw-codex-ink: #042f2a;
+  --hw-opencode: #a78bfa;
+  --hw-opencode-ink: #1e0b4a;
+}
+
+@theme inline {
+  --color-canvas: var(--hw-canvas);
+  --color-surface: var(--hw-surface);
+  --color-sunken: var(--hw-sunken);
+  --color-field: var(--hw-field);
+  --color-line: var(--hw-line);
+  --color-ink: var(--hw-ink);
+  --color-muted: var(--hw-muted);
+  --color-accent: var(--hw-accent);
+  --color-accent-ink: var(--hw-accent-ink);
+  --color-focus: var(--hw-focus);
+  --color-ok: var(--hw-ok);
+  --color-ok-ink: var(--hw-ok-ink);
+  --color-danger-ink: var(--hw-danger-ink);
+  --color-danger-line: var(--hw-danger-line);
+  --color-well: var(--hw-well);
+  --color-line-soft: var(--hw-line-soft);
+  --color-accent-soft: var(--hw-accent-soft);
+  --color-accent-soft-ink: var(--hw-accent-soft-ink);
+  --color-ok-dot: var(--hw-ok-dot);
+  --color-idle: var(--hw-idle);
+  --color-idle-dot: var(--hw-idle-dot);
+  --color-inverse: var(--hw-inverse);
+  --color-inverse-ink: var(--hw-inverse-ink);
+  --color-scrim: var(--hw-scrim);
+  --color-claude: var(--hw-claude);
+  --color-claude-ink: var(--hw-claude-ink);
+  --color-codex: var(--hw-codex);
+  --color-codex-ink: var(--hw-codex-ink);
+  --color-opencode: var(--hw-opencode);
+  --color-opencode-ink: var(--hw-opencode-ink);
+  --color-inset: var(--hw-inset);
+  --color-foot: var(--hw-foot);
+  --color-danger: var(--hw-danger);
+  --color-term: var(--hw-term);
+  --color-term-line: var(--hw-term-line);
+  --color-term-ink: #e8e6e1;
+  --color-term-muted: #8c897f;
+  --color-term-prompt: #8e9bff;
+  --color-dialog-scrim: var(--hw-dialog-scrim);
+  --color-tool: var(--hw-tool);
+  --color-tool-ink: var(--hw-tool-ink);
+  --color-ask: var(--hw-ask);
+  --color-ask-line: var(--hw-ask-line);
+  --color-stream: var(--hw-stream);
+  --color-question-alt: var(--hw-question-alt);
+  --color-question-line: var(--hw-question-line);
+  --color-question-tile: var(--hw-question-tile);
+  --color-question-soft: var(--hw-question-soft);
+  --color-ink-soft: var(--hw-ink-soft);
+  --shadow-dialog: var(--hw-dialog-shadow);
+  --shadow-drawer: var(--hw-drawer-shadow);
+  --shadow-fab: var(--hw-fab-shadow);
+  --font-sans: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+
+body {
+  @apply bg-canvas font-sans text-ink antialiased transition-colors duration-200;
+}
+
+/* iOS zooms into any field under 16px when it gets focus: never let a touch device see one */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
+/* agent replies rendered from markdown (ChatView) */
+.hw-md > * + * { margin-top: 0.75em; }
+.hw-md h1, .hw-md h2, .hw-md h3 { font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
+.hw-md h1 { font-size: 1.3em; }
+.hw-md h2 { font-size: 1.18em; }
+.hw-md h3 { font-size: 1.05em; }
+.hw-md ul { list-style: disc; padding-left: 1.4em; }
+.hw-md ol { list-style: decimal; padding-left: 1.4em; }
+.hw-md li + li { margin-top: 0.25em; }
+.hw-md a { color: var(--hw-accent-ink); text-decoration: underline; }
+.hw-md strong { font-weight: 700; color: var(--hw-ink); }
+.hw-md :not(pre) > code { font-family: var(--font-mono); font-size: 0.86em; padding: 0.1em 0.35em; border-radius: 6px; background: var(--hw-sunken); }
+.hw-md pre { font-family: var(--font-mono); font-size: 13px; line-height: 1.6; padding: 12px 14px; border-radius: 12px; background: var(--hw-term); color: #e8e6e1; overflow-x: auto; }
+.hw-md blockquote { border-left: 3px solid var(--hw-line); padding-left: 0.9em; color: var(--hw-muted); }
+.hw-md table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.92em; }
+.hw-md th, .hw-md td { border: 1px solid var(--hw-line); padding: 6px 10px; text-align: left; }
+.hw-md th { background: var(--hw-sunken); font-weight: 600; }
+.hw-md hr { border: 0; border-top: 1px solid var(--hw-line); }
