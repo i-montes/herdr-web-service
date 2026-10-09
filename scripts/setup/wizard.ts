@@ -21,6 +21,8 @@ import {
   installUnit, restartUnit, stopUnit, uninstallUnit, unitInstalled, unitRunning, type Unit, type UnitParams,
 } from "./service.ts";
 import { installStatusLine, statusLineCommand, statusLinePaths, type InstallResult } from "./statusline.ts";
+import { installIntegration, integrationStates, type IntegrationId, type IntegrationState } from "./integrations.ts";
+import { defaultRun } from "./tunnel/run.ts";
 import { renderSummary } from "./summary.ts";
 import { exposeArgs } from "./tunnel/portal.ts";
 import { funnelServes, setupTunnel, teardownTunnel, type TunnelKind, type TunnelResult } from "./tunnel/index.ts";
@@ -66,6 +68,9 @@ export interface WizardDeps {
   stopLooseServer: () => Promise<unknown>;
   /** registers our Claude Code status line (context and plan usage for the web chat) */
   installStatusLine: () => InstallResult;
+  /** Herdr's integrations for the agents the web chat reads (Claude Code, OpenCode) */
+  integrations: () => Promise<IntegrationState[]>;
+  installIntegration: (id: IntegrationId) => Promise<{ ok: boolean; message: string }>;
   verifyHealth: (url: string) => Promise<HealthResult>;
   /** runs `cleanup` on SIGINT/SIGHUP/SIGTERM, then exits 130; returns the unsubscribe */
   onInterrupt: (cleanup: () => Promise<void>) => () => void;
@@ -128,6 +133,8 @@ export function defaultDeps(): WizardDeps {
         statusLinePaths(CONFIG_DIR),
         statusLineCommand({ bun: process.execPath, root: ROOT, stateDir: STATE_DIR, configDir: CONFIG_DIR }),
       ),
+    integrations: () => integrationStates(defaultRun),
+    installIntegration: (id) => installIntegration(defaultRun, id),
     verifyHealth: (url) => verifyHealth(url),
     onInterrupt,
   };
@@ -169,6 +176,36 @@ async function lanHost(deps: WizardDeps, savedHost: string | undefined): Promise
     return ip;
   }
   throw new SetupAborted("No valid local network IPv4 address: connect this machine to the network and try again.");
+}
+
+/**
+ * Step 7c: Herdr's integrations for Claude Code and OpenCode, asked before touching each agent's
+ * config. Never fatal: without them the web chat finds a conversation by its folder instead.
+ */
+async function integrationsStep(deps: WizardDeps): Promise<void> {
+  let states: IntegrationState[];
+  try {
+    states = await deps.integrations();
+  } catch (error) {
+    deps.log(`Could not check Herdr's agent integrations: ${(error as Error).message}`);
+    return;
+  }
+  for (const s of states) {
+    if (!s.agentPresent) continue;
+    if (s.status === "current") {
+      deps.log(`Herdr integration for ${s.label}: installed`);
+      continue;
+    }
+    const verb = s.status === "missing" ? "Install" : "Update";
+    const question = `${verb} Herdr's ${s.label} integration? It adds ${s.what} so Herdr knows which conversation runs in each session, and the web chat shows the right one.`;
+    if (!(await deps.confirm(question, true))) {
+      deps.log(`Herdr integration for ${s.label}: skipped. The web chat will pick ${s.label}'s newest conversation in the folder.`);
+      continue;
+    }
+    const result = await deps.installIntegration(s.id);
+    if (result.ok) deps.log(`Herdr integration for ${s.label}: ${s.status === "missing" ? "installed" : "updated"}. Agents started from now on report their conversation.`);
+    else deps.log(`Could not install Herdr's ${s.label} integration: ${result.message || "unknown error"}. Try: herdr integration install ${s.id}`);
+  }
 }
 
 /** Step 7b: never fatal, the server works without it (the web chat just shows no usage). */
@@ -350,6 +387,7 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
     }
     unsubscribe();
     statusLineStep(deps);
+    await integrationsStep(deps);
 
     // 8. verification
     for (;;) {

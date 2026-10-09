@@ -6,6 +6,7 @@ import { readEnv } from "./env.ts";
 import type { TunnelKind, TunnelResult } from "./tunnel/index.ts";
 import type { Unit, UnitParams } from "./service.ts";
 import type { InstallResult } from "./statusline.ts";
+import type { IntegrationId, IntegrationState } from "./integrations.ts";
 import { PUBLIC_IP, runWizard, SetupAborted, URL_CHANGE, type WizardDeps } from "./wizard.ts";
 
 let dir = "";
@@ -44,6 +45,8 @@ function harness(opts: {
   lan?: string | null;
   installResult?: "installed" | "unchanged";
   statusLine?: () => InstallResult;
+  integrations?: () => Promise<IntegrationState[]>;
+  installIntegration?: (id: IntegrationId) => { ok: boolean; message: string };
 }): Harness {
   const calls: string[] = [];
   const confirms: string[] = [];
@@ -121,6 +124,14 @@ function harness(opts: {
       calls.push("statusline");
       return opts.statusLine ? opts.statusLine() : { status: "installed" };
     },
+    integrations: async () => {
+      calls.push("integrations");
+      return opts.integrations ? opts.integrations() : [];
+    },
+    installIntegration: async (id) => {
+      calls.push(`integration:${id}`);
+      return opts.installIntegration ? opts.installIntegration(id) : { ok: true, message: "" };
+    },
     verifyHealth: async (url) => {
       calls.push(`verify:${url}`);
       return health.shift() ?? { ok: true };
@@ -141,7 +152,7 @@ describe("runWizard", () => {
     expect(readEnv(envPath)).toEqual({ ACCESS_MODE: "local", HOST: "127.0.0.1", PORT: "7340", PUBLIC_URL: "http://localhost:7340" });
     expect(h.calls).toEqual([
       "choose:Where will you use the web client from?:local", "password", "stopLoose", "install:server",
-      "statusline", "verify:http://localhost:7340", "enter",
+      "statusline", "integrations", "verify:http://localhost:7340", "enter",
     ]);
     expect(h.output()).toContain("http://localhost:7340");
   });
@@ -313,6 +324,44 @@ describe("runWizard", () => {
     await runWizard(h.deps);
     expect(h.output()).toContain("This machine cannot resolve x.ts.net yet");
     expect(h.output()).toContain("Done.");
+  });
+
+  describe("Herdr's agent integrations", () => {
+    const state = (id: IntegrationId, status: IntegrationState["status"], agentPresent = true): IntegrationState => ({ id, label: id === "claude" ? "Claude Code" : "OpenCode", what: "x", status, agentPresent });
+
+    test("a missing one is offered and installed; a current one is only reported; an absent agent is left out", async () => {
+      const h = harness({ chooses: ["local"], integrations: async () => [state("claude", "missing"), state("opencode", "current")] });
+      await runWizard(h.deps);
+      expect(h.confirms.some((c) => c.startsWith("Install Herdr's Claude Code integration?"))).toBe(true);
+      expect(h.calls).toContain("integration:claude");
+      expect(h.calls).not.toContain("integration:opencode");
+      expect(h.output()).toContain("Herdr integration for Claude Code: installed.");
+      expect(h.output()).toContain("Herdr integration for OpenCode: installed");
+
+      const none = harness({ chooses: ["local"], integrations: async () => [state("claude", "missing", false), state("opencode", "missing", false)] });
+      await runWizard(none.deps);
+      expect(none.confirms.some((c) => c.includes("integration"))).toBe(false);
+    });
+
+    test("saying no installs nothing and says what the chat does instead", async () => {
+      const h = harness({ chooses: ["local"], answers: { "OpenCode integration": false }, integrations: async () => [state("opencode", "outdated")] });
+      await runWizard(h.deps);
+      expect(h.confirms.some((c) => c.startsWith("Update Herdr's OpenCode integration?"))).toBe(true);
+      expect(h.calls).not.toContain("integration:opencode");
+      expect(h.output()).toContain("skipped. The web chat will pick OpenCode's newest conversation in the folder.");
+    });
+
+    test("a failure, or Herdr unable to tell, never stops setup", async () => {
+      const h = harness({ chooses: ["local"], integrations: async () => [state("claude", "missing")], installIntegration: () => ({ ok: false, message: "config dir missing" }) });
+      await runWizard(h.deps);
+      expect(h.output()).toContain("Could not install Herdr's Claude Code integration: config dir missing. Try: herdr integration install claude");
+      expect(h.calls.at(-1)).toBe("enter");
+
+      const broken = harness({ chooses: ["local"], integrations: async () => { throw new Error("herdr: not found"); } });
+      await runWizard(broken.deps);
+      expect(broken.output()).toContain("Could not check Herdr's agent integrations: herdr: not found");
+      expect(broken.calls.at(-1)).toBe("enter");
+    });
   });
 
   describe("Claude Code status line", () => {

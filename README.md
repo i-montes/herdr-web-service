@@ -72,7 +72,10 @@ The wizard:
 3. Sets up the tunnel if needed.
 4. Installs the service, which starts again after a reboot.
 5. Registers Claude Code's status line (see [below](#claude-code-status-line)).
-6. Checks that the URL answers, then shows the URL and a **QR code** to open it on your phone.
+6. Offers to install Herdr's integrations for Claude Code and OpenCode (asks before each). They let
+   Herdr know which conversation runs in each session, so the chat shows the right one; without
+   them it picks the newest conversation in the folder.
+7. Checks that the URL answers, then shows the URL and a **QR code** to open it on your phone.
 
 Run it again whenever you like: with the same answers nothing changes.
 

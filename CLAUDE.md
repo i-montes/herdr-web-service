@@ -113,6 +113,8 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   para probarlo con fakes), `preflight.ts`, `env.ts` (lee/escribe `.env`), `network.ts` (IP LAN y
   URL canónica), `password.ts`, `service.ts` (unidades `systemd --user` / LaunchAgent: `server`
   y `tunnel`), `statusline.ts` (registra, encadena y restaura la status line de Claude Code),
+  `integrations.ts` (integraciones de Herdr para Claude Code y OpenCode: lee `herdr integration
+  status`, ofrece instalar las que faltan si el agente existe; nunca hace fallar el setup),
   `loose.ts` (servidor suelto), `verify.ts` (health), `summary.ts` (URL, QR, límites del modo),
   `uninstall.ts`.
 - `scripts/setup/tunnel/` — `index.ts` (`setupTunnel`/`teardownTunnel`/`funnelServes`),
