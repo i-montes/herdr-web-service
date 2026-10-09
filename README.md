@@ -169,7 +169,7 @@ herdr plugin uninstall imontes.herdr-web-service
 
 - **The wizard does not show up** after invoking `setup`: the popup opens on Herdr's screen.
   Attach to Herdr to see it. If it says `a popup pane is already open`, one is already open.
-- **"Este equipo aún no resuelve …ts.net"** (this machine can't resolve the name yet): the
+- **"This machine cannot resolve …ts.net yet"**: the
   server's DNS does not know the new tunnel name yet. The wizard checks through public DNS
   instead; from the internet it works the same.
 - **Server log**: on Linux, `journalctl --user -u herdr-web-service.service`; on macOS,
