@@ -52,7 +52,7 @@ alguna forma de auth la tratan como opcional o secundaria.
    password; la password solo se fija desde el host (acción `setup` o `set-password`), nunca por
    HTTP. Segundo factor (passkey/TOTP) después.
 2. **HTTPS por túnel, sin dominio propio ni Caddy**: Tailscale Funnel por defecto (URL estable,
-   certificado real, cuenta de Tailscale; en Linux puede pedir `sudo` para instalar Tailscale y para `tailscale up`/`set --operator`; en macOS se instala la app) y Portal como
+   certificado real, cuenta de Tailscale; en Linux puede pedir `sudo` para instalar Tailscale y para `tailscale login`/`set --operator`; en macOS se instala la app) y Portal como
    alternativa (sin cuenta ni sudo). El servidor Bun queda en loopback (o en la IP de la LAN en
    modo red local) y el túnel hace de front; no se abre ningún puerto entrante.
 3. **Servicio persistente de usuario**: unidad `systemd --user` (Linux, con `linger`) /

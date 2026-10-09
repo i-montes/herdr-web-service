@@ -58,10 +58,12 @@ async function status(bin: string, run: Runner) {
 
 export async function ensureLoggedIn(bin: string, run: Runner = defaultRun): Promise<void> {
   if ((await status(bin, run)).state === "Running") return;
-  console.log("Tailscale necesita iniciar sesión. Se ejecutará `sudo tailscale up`; abre el link que aparezca.");
+  console.log("Tailscale necesita iniciar sesión. Se ejecutará `sudo tailscale login`; abre el link que aparezca.");
   const sudo = process.platform === "darwin" ? [] : ["sudo"];
-  const r = await run([...sudo, bin, "up"], { inherit: true });
-  if (r.code !== 0) throw new Error("`tailscale up` falló");
+  // `login`, not `up`: `up` refuses when the host already has non-default settings (hostname,
+  // accept-dns...) unless all are repeated; `login` keeps them as they are.
+  const r = await run([...sudo, bin, "login"], { inherit: true });
+  if (r.code !== 0) throw new Error("`tailscale login` falló");
   if ((await status(bin, run)).state !== "Running") throw new Error("Tailscale no quedó conectado");
 }
 

@@ -156,3 +156,19 @@ test("ensureOperator on Linux sets the operator with sudo when the probe fails",
   await ensureOperator("/usr/bin/tailscale", run, "linux");
   expect(calls.find((argv) => argv[0] === "sudo")?.slice(0, 3)).toEqual(["sudo", "/usr/bin/tailscale", "set"]);
 });
+
+test("ensureLoggedIn logs in without `up`, which refuses when the host has non-default settings", async () => {
+  const calls: string[][] = [];
+  let loggedIn = false;
+  const run = async (argv: string[]) => {
+    calls.push(argv);
+    if (argv.includes("login")) loggedIn = true;
+    if (argv.includes("status")) {
+      return { code: 0, stdout: loggedIn ? STATUS : STATUS.replace('"Running"', '"NeedsLogin"'), stderr: "" };
+    }
+    return { code: 0, stdout: "", stderr: "" };
+  };
+  await ensureLoggedIn("tailscale", run);
+  expect(calls.some((argv) => argv.at(-1) === "login")).toBe(true);
+  expect(calls.some((argv) => argv.includes("up"))).toBe(false);
+});
