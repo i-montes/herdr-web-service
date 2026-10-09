@@ -7,6 +7,16 @@ export function parseStatus(json: string): { state: string; dnsName: string | nu
   return { state: s.BackendState ?? "Unknown", dnsName: dns || null };
 }
 
+/**
+ * The flags `tailscale up` asks to repeat when the host already has non-default settings
+ * (hostname, accept-dns...), or null. Repeating them keeps them; `--reset` or `login` would not.
+ */
+export function upKeepFlags(output: string): string[] | null {
+  if (!output.includes("requires mentioning all")) return null;
+  const line = output.split("\n").map((l) => l.trim()).find((l) => l.startsWith("tailscale up "));
+  return line ? line.slice("tailscale up ".length).split(/\s+/).filter(Boolean) : null;
+}
+
 export function enableLinkFrom(output: string): string | null {
   return output.match(/https:\/\/login\.tailscale\.com\/\S+/)?.[0] ?? null;
 }
@@ -58,12 +68,16 @@ async function status(bin: string, run: Runner) {
 
 export async function ensureLoggedIn(bin: string, run: Runner = defaultRun): Promise<void> {
   if ((await status(bin, run)).state === "Running") return;
-  console.log("Tailscale necesita iniciar sesión. Se ejecutará `sudo tailscale login`; abre el link que aparezca.");
+  console.log("Tailscale necesita iniciar sesión: abre el link que aparezca.");
   const sudo = process.platform === "darwin" ? [] : ["sudo"];
-  // `login`, not `up`: `up` refuses when the host already has non-default settings (hostname,
-  // accept-dns...) unless all are repeated; `login` keeps them as they are.
-  const r = await run([...sudo, bin, "login"], { inherit: true });
-  if (r.code !== 0) throw new Error("`tailscale login` falló");
+  // tee: `up` prints the login link and waits for it. Never `login`: it resets the host's settings.
+  let r = await run([...sudo, bin, "up"], { tee: true });
+  const keep = r.code === 0 ? null : upKeepFlags(`${r.stdout}\n${r.stderr}`);
+  if (keep) {
+    console.log(`Se conservan los ajustes que ya tenía Tailscale en este equipo (${keep.join(" ")}).`);
+    r = await run([...sudo, bin, "up", ...keep], { tee: true });
+  }
+  if (r.code !== 0) throw new Error("`tailscale up` falló");
   if ((await status(bin, run)).state !== "Running") throw new Error("Tailscale no quedó conectado");
 }
 
@@ -72,8 +86,13 @@ export async function ensureOperator(bin: string, run: Runner = defaultRun, plat
   if (platform !== "linux") return;
   const user = process.env.USER ?? process.env.LOGNAME;
   if (!user) return;
-  // Probe: a read-only funnel command works without sudo once the operator is set.
-  if ((await run([bin, "funnel", "status"])).code === 0) return;
+  // Read from the prefs: read-only commands like `funnel status` work without the operator too.
+  try {
+    const prefs = await run([bin, "debug", "prefs"]);
+    if ((JSON.parse(prefs.stdout) as { OperatorUser?: string }).OperatorUser === user) return;
+  } catch {
+    /* unreadable: setting it again is harmless */
+  }
   console.log("Se ejecutará `sudo tailscale set --operator` para no pedir sudo en los pasos siguientes.");
   const r = await run(["sudo", bin, "set", `--operator=${user}`], { inherit: true });
   if (r.code !== 0) throw new Error("No se pudo fijar el operador de Tailscale");
@@ -86,6 +105,7 @@ export async function ensureFunnel(port: number, bin: string, run: Runner = defa
     const r = await run([bin, "funnel", "--bg", String(port)], { tee: true });
     if (r.code === 0) break;
     const out = `${r.stdout}\n${r.stderr}`;
+    if (/access denied/i.test(out)) throw new Error(`tailscale funnel sin permiso (falta el operator de Tailscale): ${out.trim()}`);
     const link = enableLinkFrom(out);
     if (!link) throw new Error(`tailscale funnel falló: ${out.trim()}`);
     console.log("Funnel no está habilitado en tu tailnet. Ábrelo y actívalo:");

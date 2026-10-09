@@ -52,6 +52,17 @@ test("ensureFunnel: enable link, confirm, retry succeeds", async () => {
   expect(logSpy.mock.calls.flat().join("\n")).toContain("https://login.tailscale.com/f/funnel?node=abc");
 });
 
+test("ensureFunnel: access denied is an operator problem, not an enable link to retry", async () => {
+  const confirmSpy = spyOn(tui, "confirm").mockReturnValue(true);
+  const run: Runner = async () => ({
+    code: 1,
+    stdout: "To enable, visit:\n https://login.tailscale.com/f/funnel?node=abc\nSuccess.\n",
+    stderr: "sending serve config: Access denied: serve config denied\n",
+  });
+  await expect(ensureFunnel(7340, "tailscale", run)).rejects.toThrow("operator");
+  expect(confirmSpy).not.toHaveBeenCalled();
+});
+
 test("ensureFunnel throws on a failure without a link", async () => {
   const run: Runner = async () => ({ code: 1, stdout: "", stderr: "boom" });
   await expect(ensureFunnel(7340, "tailscale", run)).rejects.toThrow("boom");
@@ -147,6 +158,32 @@ test("ensureOperator never runs sudo on macOS, even when the probe fails", async
   expect(calls.some((argv) => argv[0] === "sudo")).toBe(false);
 });
 
+test("ensureOperator: a working `funnel status` does not mean the operator is set", async () => {
+  const user = process.env.USER;
+  process.env.USER = "ubuntu";
+  const calls: string[][] = [];
+  const run: Runner = async (argv) => {
+    calls.push(argv);
+    return { code: 0, stdout: argv.includes("prefs") ? '{"WantRunning":true,"OperatorUser":""}' : "", stderr: "" };
+  };
+  await ensureOperator("tailscale", run, "linux");
+  process.env.USER = user;
+  expect(calls).toContainEqual(["sudo", "tailscale", "set", "--operator=ubuntu"]);
+});
+
+test("ensureOperator: already this user's, no sudo", async () => {
+  const user = process.env.USER;
+  process.env.USER = "ubuntu";
+  const calls: string[][] = [];
+  const run: Runner = async (argv) => {
+    calls.push(argv);
+    return { code: 0, stdout: argv.includes("prefs") ? '{"OperatorUser":"ubuntu"}' : "", stderr: "" };
+  };
+  await ensureOperator("tailscale", run, "linux");
+  process.env.USER = user;
+  expect(calls.some((argv) => argv[0] === "sudo")).toBe(false);
+});
+
 test("ensureOperator on Linux sets the operator with sudo when the probe fails", async () => {
   const calls: string[][] = [];
   const run: Runner = async (argv) => {
@@ -157,20 +194,50 @@ test("ensureOperator on Linux sets the operator with sudo when the probe fails",
   expect(calls.find((argv) => argv[0] === "sudo")?.slice(0, 3)).toEqual(["sudo", "/usr/bin/tailscale", "set"]);
 });
 
-test("ensureLoggedIn logs in without `up`, which refuses when the host has non-default settings", async () => {
-  const calls: string[][] = [];
+const UP_REFUSED = `Error: changing settings via 'tailscale up' requires mentioning all
+non-default flags. To proceed, either re-run your command with --reset or
+use the command below to explicitly mention the current value of
+all non-default settings:
+
+	tailscale up --accept-dns=false --hostname=fyndea-vps
+
+`;
+
+/** A logged-out Tailscale whose `up` behaves like `up` (refusing on unmentioned settings). */
+function loggedOut(opts: { refuses: boolean }) {
+  const calls: { argv: string[]; tee?: boolean }[] = [];
   let loggedIn = false;
-  const run = async (argv: string[]) => {
-    calls.push(argv);
-    if (argv.includes("login")) loggedIn = true;
-    if (argv.includes("status")) {
-      return { code: 0, stdout: loggedIn ? STATUS : STATUS.replace('"Running"', '"NeedsLogin"'), stderr: "" };
+  const run = async (argv: string[], o?: { inherit?: boolean; tee?: boolean }) => {
+    calls.push({ argv, tee: o?.tee });
+    if (argv.includes("status")) return { code: 0, stdout: loggedIn ? STATUS : STATUS.replace('"Running"', '"NeedsLogin"'), stderr: "" };
+    if (argv.includes("login")) {
+      loggedIn = true; // and silently resets every setting: must never be used
+      return { code: 0, stdout: "", stderr: "" };
+    }
+    if (argv.includes("up")) {
+      if (opts.refuses && !argv.includes("--hostname=fyndea-vps")) return { code: 1, stdout: "", stderr: UP_REFUSED };
+      loggedIn = true;
+      return { code: 0, stdout: "Success.\n", stderr: "" };
     }
     return { code: 0, stdout: "", stderr: "" };
   };
-  await ensureLoggedIn("tailscale", run);
-  expect(calls.some((argv) => argv.at(-1) === "login")).toBe(true);
-  expect(calls.some((argv) => argv.includes("up"))).toBe(false);
+  const ups = () => calls.filter((c) => c.argv.includes("up") || c.argv.includes("login"));
+  return { run, ups };
+}
+
+test("ensureLoggedIn runs `up` and shows its output (the login link)", async () => {
+  const t = loggedOut({ refuses: false });
+  await ensureLoggedIn("tailscale", t.run);
+  expect(t.ups().map((c) => [c.argv.slice(-2), c.tee])).toEqual([[["tailscale", "up"], true]]);
+});
+
+test("ensureLoggedIn keeps the host's own settings: repeats them when `up` asks to", async () => {
+  const t = loggedOut({ refuses: true });
+  await ensureLoggedIn("tailscale", t.run);
+  expect(t.ups().map((c) => c.argv.slice(c.argv.indexOf("tailscale")))).toEqual([
+    ["tailscale", "up"],
+    ["tailscale", "up", "--accept-dns=false", "--hostname=fyndea-vps"],
+  ]);
 });
 
 test("ensureFunnel shows tailscale's output: it may wait on an enable link instead of exiting", async () => {
