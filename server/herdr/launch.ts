@@ -12,8 +12,15 @@ import { uploadDir } from "../uploads.ts";
 
 export const SESSION_KINDS = ["shell", "claude", "codex", "opencode"] as const;
 export type SessionKind = (typeof SESSION_KINDS)[number];
-export const PERMISSIONS = ["ask", "edits", "plan"] as const;
+export const PERMISSIONS = ["ask", "edits", "plan", "bypass"] as const;
 export type Permission = (typeof PERMISSIONS)[number];
+/** what each kind can start with; "bypass" skips every permission check */
+export const KIND_PERMISSIONS: Record<SessionKind, readonly Permission[]> = {
+  shell: ["ask"],
+  claude: ["ask", "edits", "plan", "bypass"],
+  codex: ["ask"],
+  opencode: ["ask", "bypass"],
+};
 
 export interface NewSession {
   /** absolute, real folder inside home */
@@ -45,6 +52,7 @@ export function parseNewSession(body: unknown, home: string): { ok: true; value:
   if (!SESSION_KINDS.includes(kind)) return { ok: false, error: "unknown kind" };
   const permission = (b["permission"] ?? "ask") as Permission;
   if (!PERMISSIONS.includes(permission)) return { ok: false, error: "unknown permission" };
+  if (!KIND_PERMISSIONS[kind].includes(permission)) return { ok: false, error: `${kind} cannot start with permission ${permission}` };
   const command = text(b["command"]);
   if (/[\r\n]/.test(command)) return { ok: false, error: "command must be one line" };
   const message = text(b["message"]);
@@ -55,12 +63,15 @@ export function parseNewSession(body: unknown, home: string): { ok: true; value:
 
 /**
  * Claude Code's --permission-mode, always explicit: "ask" must ask even when the user's settings
- * default to auto mode; and --add-dir for the chat's image folder, so reading a pasted image does
- * not ask each time. The other agents start with their own defaults.
+ * default to auto mode; bypass is --dangerously-skip-permissions. Plus --add-dir for the chat's
+ * image folder, so reading a pasted image does not ask each time. OpenCode's bypass is --auto
+ * (approves what its config does not deny); otherwise agents start with their own defaults.
  */
 export function agentArgs(kind: SessionKind, permission: Permission, imageDir = uploadDir()): string[] {
+  if (kind === "opencode") return permission === "bypass" ? ["--auto"] : [];
   if (kind !== "claude") return [];
-  return ["--permission-mode", permission === "ask" ? "default" : permission === "edits" ? "acceptEdits" : "plan", "--add-dir", imageDir];
+  const mode = { ask: ["--permission-mode", "default"], edits: ["--permission-mode", "acceptEdits"], plan: ["--permission-mode", "plan"], bypass: ["--dangerously-skip-permissions"] };
+  return [...mode[permission], "--add-dir", imageDir];
 }
 
 /** pane_id → first message waiting for its agent to be ready */

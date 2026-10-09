@@ -24,7 +24,9 @@ computer, on your home network or on a VPS, and installs with a single command.
 - **Model, effort and usage at a glance**: context used and Claude plan limits (5 h and weekly);
   for OpenCode, model, variant and cost.
 - **New session** from the web: pick a folder and start a shell, Claude Code, Codex or OpenCode,
-  with an optional first message.
+  with an optional first message and a permission mode. Claude Code and OpenCode can also start
+  in **bypass** (no permission prompts: `--dangerously-skip-permissions` / `--auto`); it is never
+  preselected, you choose it each time.
 - **Images in the chat** (PNG, JPEG, GIF, WebP) for the agent to read.
 - **Terminal view** for shells, Codex and any session when you need it.
 - **Installable app (PWA)** on your phone, plus a **QR code** to open it from your desktop.

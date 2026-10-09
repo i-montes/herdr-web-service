@@ -39,7 +39,9 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   - `herdr/roster.ts` — `session.snapshot` → roster (workspaces + paneles) que dibuja la web.
   - `herdr/launch.ts` — crea sesiones (`POST /api/sessions`): pestaña en el workspace de esa
     carpeta o workspace nuevo; arranca shell o agente; el primer mensaje espera a que el agente
-    quede `idle` (si no, caería en el aviso de confianza de Claude).
+    quede `idle` (si no, caería en el aviso de confianza de Claude). Permisos por agente
+    (`KIND_PERMISSIONS`): Claude `ask|edits|plan|bypass` (`--dangerously-skip-permissions`),
+    OpenCode `ask|bypass` (`--auto`), shell y Codex solo `ask`. La web nunca recuerda el bypass.
   - `chat/` — chat de Claude Code (`GET /api/panes/:id/chat?v=`, `POST …/prompt`, `POST …/choose`):
     `store.ts` localiza el transcript (el `agent_session` que reporta la integración de Herdr
     —`herdr integration install claude`, hook `SessionStart`— o, si falta, el JSONL más reciente

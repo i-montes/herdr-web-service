@@ -67,12 +67,26 @@ test("asking is explicit for Claude, whatever its default mode", async () => {
   const { agentArgs } = await import("./launch.ts");
   expect(agentArgs("claude", "ask", "/tmp/i")).toEqual(["--permission-mode", "default", "--add-dir", "/tmp/i"]);
   expect(agentArgs("claude", "edits", "/tmp/i")).toEqual(["--permission-mode", "acceptEdits", "--add-dir", "/tmp/i"]);
-  expect(agentArgs("opencode", "plan")).toEqual([]);
+  expect(agentArgs("opencode", "ask")).toEqual([]);
+});
+
+test("bypass skips every permission check: Claude and OpenCode each with their own flag", async () => {
+  const { agentArgs } = await import("./launch.ts");
+  expect(agentArgs("claude", "bypass", "/tmp/i")).toEqual(["--dangerously-skip-permissions", "--add-dir", "/tmp/i"]);
+  expect(agentArgs("opencode", "bypass")).toEqual(["--auto"]);
+});
+
+test("each agent only takes the permissions it has", () => {
+  const ok = (kind: string, permission: string) => parseNewSession({ cwd: "~/p/app", kind, permission }, home).ok;
+  expect(["ask", "edits", "plan", "bypass"].map((p) => ok("claude", p))).toEqual([true, true, true, true]);
+  expect(["ask", "edits", "plan", "bypass"].map((p) => ok("opencode", p))).toEqual([true, false, false, true]);
+  expect(["ask", "edits", "plan", "bypass"].map((p) => ok("codex", p))).toEqual([true, false, false, false]);
+  expect(ok("shell", "bypass")).toBe(false);
 });
 
 test("other agents get no permission flags", async () => {
   const h = fake();
-  const parsed = parseNewSession({ cwd: "~/p/app", kind: "codex", permission: "edits" }, home);
+  const parsed = parseNewSession({ cwd: "~/p/app", kind: "codex" }, home);
   if (!parsed.ok) throw new Error(parsed.error);
   await launchSession(h, parsed.value, roster, home);
   expect(h.calls[1]).toEqual(["agent.start", { name: "app-codex", kind: "codex", pane_id: "w1:p9", args: [] }]);

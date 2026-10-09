@@ -31,7 +31,7 @@ export interface OpencodeOptions {
   variants: (string | null)[];
   current: { model: string | null; variant: string | null };
 }
-export type Permission = "ask" | "edits" | "plan";
+export type Permission = "ask" | "edits" | "plan" | "bypass";
 
 export interface NewSessionBody {
   cwd: string;

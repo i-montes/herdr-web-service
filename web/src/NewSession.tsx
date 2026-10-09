@@ -7,11 +7,18 @@ import { Icon } from "./Home.tsx";
 
 const KINDS: SessionKind[] = ["shell", "claude", "codex", "opencode"];
 
-const PERMISSIONS: { id: Permission; label: string; desc: string }[] = [
+const PERMISSIONS: { id: Permission; label: string; desc: string; danger?: boolean }[] = [
   { id: "ask", label: "Preguntar siempre", desc: "Cada edición y comando pasa por ti." },
   { id: "edits", label: "Aceptar ediciones", desc: "Edita archivos solo; pide permiso para la terminal." },
   { id: "plan", label: "Solo planear", desc: "Lee y propone un plan, sin tocar nada." },
+  { id: "bypass", label: "Sin permisos (bypass)", desc: "Edita y ejecuta comandos sin preguntarte. Úsalo solo en carpetas de confianza.", danger: true },
 ];
+
+/** the permissions each agent can start with (the server checks the same); never remembered */
+const KIND_PERMISSIONS: Partial<Record<SessionKind, Permission[]>> = {
+  claude: ["ask", "edits", "plan", "bypass"],
+  opencode: ["ask", "bypass"],
+};
 
 const COMMAND_CHIPS = ["git status", "ls -la"];
 
@@ -65,8 +72,10 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
   const look = agentLook(isShell ? null : kind);
   const defaultName = `${lastSegment(path)}-${kind}`;
   const sessionName = name ?? defaultName;
-  const perm = PERMISSIONS.find((p) => p.id === permission)!;
-  const summary = isShell || kind !== "claude" ? sessionName : `${sessionName} · ${perm.label}`;
+  const permOptions = PERMISSIONS.filter((p) => KIND_PERMISSIONS[kind]?.includes(p.id));
+  // a choice the new agent does not have falls back to asking
+  const perm = permOptions.find((p) => p.id === permission) ?? PERMISSIONS[0]!;
+  const summary = permOptions.length === 0 ? sessionName : `${sessionName} · ${perm.label}`;
   const startLabel = isShell ? "Abrir terminal" : `Iniciar ${look.label}`;
 
   useEffect(() => {
@@ -106,7 +115,7 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
         cwd: path,
         kind,
         name: sessionName,
-        ...(isShell ? { command } : { message, permission: kind === "claude" ? permission : "ask" }),
+        ...(isShell ? { command } : { message, permission: perm.id }),
       });
       saveLast(path, kind);
       onCreated(created.pane_id);
@@ -260,24 +269,26 @@ export function NewSessionDialog({ roster, initialPath, onClose, onCreated }: {
                     className="h-11 rounded-[10px] border border-line bg-surface px-3.5 font-mono text-base text-ink lg:text-sm outline-none focus:border-accent-ink"
                   />
                 </div>
-                {kind === "claude" && (
+                {permOptions.length > 0 && (
                   <div role="radiogroup" aria-labelledby="ns-perm" className="flex flex-col gap-1.5">
                     <span id="ns-perm" className="text-[13px] font-bold">Permisos</span>
                     <div className="flex flex-wrap gap-1.5">
-                      {PERMISSIONS.map((p) => (
+                      {permOptions.map((p) => (
                         <button
                           key={p.id}
                           type="button"
                           role="radio"
-                          aria-checked={p.id === permission}
+                          aria-checked={p.id === perm.id}
                           onClick={() => setPermission(p.id)}
-                          className={`min-h-10 cursor-pointer rounded-full border px-3.5 text-sm font-semibold ${p.id === permission ? "border-inverse bg-inverse text-inverse-ink" : "border-line bg-surface text-ink"}`}
+                          className={`min-h-10 cursor-pointer rounded-full border px-3.5 text-sm font-semibold ${
+                            p.id !== perm.id ? "border-line bg-surface text-ink" : p.danger ? "border-danger-line bg-danger text-danger-ink" : "border-inverse bg-inverse text-inverse-ink"
+                          }`}
                         >
                           {p.label}
                         </button>
                       ))}
                     </div>
-                    <span className="text-[13px] text-muted">{perm.desc}</span>
+                    <span className={`text-[13px] ${perm.danger ? "font-semibold text-danger-ink" : "text-muted"}`}>{perm.desc}</span>
                   </div>
                 )}
               </div>
