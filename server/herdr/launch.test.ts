@@ -168,3 +168,11 @@ test("a name already in use gets a numeric suffix", async () => {
   await launchSession(h, parsed.value, roster, home, noWait);
   expect(h.calls.filter(([m]) => m === "agent.start").map(([, p]) => p["name"])).toEqual(["app-claude", "app-claude-2", "app-claude-3"]);
 });
+
+test("a pane whose agent cannot start is closed again, not left as an empty shell", async () => {
+  const h = slowShell(5, "unknown agent kind");
+  const parsed = parseNewSession({ cwd: "~/p/app", kind: "claude" }, home);
+  if (!parsed.ok) throw new Error(parsed.error);
+  await expect(launchSession(h, parsed.value, roster, home, noWait)).rejects.toThrow("unknown agent kind");
+  expect(h.calls.at(-1)).toEqual(["pane.close", { pane_id: "w1:p9" }]);
+});

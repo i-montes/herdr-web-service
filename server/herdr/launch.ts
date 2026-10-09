@@ -151,7 +151,13 @@ export async function launchSession(
   if (input.kind === "shell") {
     if (input.command) await herdr.request("pane.send_text", { pane_id, text: input.command + "\n" });
   } else {
-    await startAgent(herdr, { name: agentName(input.name, input.kind), kind: input.kind, pane_id, args: agentArgs(input.kind, input.permission) }, opts);
+    try {
+      await startAgent(herdr, { name: agentName(input.name, input.kind), kind: input.kind, pane_id, args: agentArgs(input.kind, input.permission) }, opts);
+    } catch (error) {
+      // the tab was made for this agent: do not leave an empty shell behind
+      await herdr.request("pane.close", { pane_id }).catch(() => {});
+      throw error;
+    }
     if (input.message) pendingPrompts.set(pane_id, input.message);
   }
   return { pane_id };
