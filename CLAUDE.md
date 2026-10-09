@@ -127,8 +127,10 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   no tocar la configuración ni los servicios reales. Los tests unitarios (`bun test`) cubren el
   flujo con fakes.
 - Herdr cierra la conexión tras cada respuesta: `HerdrClient.request` abre una por petición.
-  `pane.agent_status_changed` exige `pane_id` (no va en la suscripción global; `pane.updated`
-  ya trae el estado).
+  `pane.agent_status_changed` exige `pane_id` (no va en la suscripción global) y es el único
+  aviso de que un agente terminó o se bloqueó: `pane.updated` no se emite entonces. El servidor
+  abre una suscripción por panel con agente (`watchStatuses`); un `pane_id` inexistente cierra la
+  suscripción entera con `pane_not_found`.
 - Llamadas a Herdr: socket directo para request/response y suscripciones; `HERDR_BIN_PATH` para
   comandos que el CLI envuelve mejor (attach de terminal).
 - Textos de UI (web, asistente, CLI) en inglés; código y comentarios también en inglés.

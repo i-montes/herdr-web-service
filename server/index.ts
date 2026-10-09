@@ -63,6 +63,7 @@ function scheduleRoster(force = false): void {
     rosterTimer = null;
     try {
       const roster = await loadRoster();
+      watchStatuses(roster);
       for (const prompt of readyPrompts(roster)) {
         herdr.request("agent.prompt", { target: prompt.pane_id, text: prompt.text }).catch((error) => console.error("first message:", error instanceof Error ? error.message : error));
       }
@@ -81,8 +82,8 @@ function scheduleRoster(force = false): void {
 
 async function ensureSubscribed(): Promise<void> {
   if (unsubscribe) return;
-  // pane.updated carries agent_status changes; pane.agent_status_changed needs a pane_id, so a
-  // global subscription to it is refused and takes the whole subscription down with it
+  // pane.agent_status_changed needs a pane_id, so a global subscription to it is refused and
+  // takes the whole subscription down with it: watchStatuses subscribes to it per pane
   const subscriptions = ["pane.created", "pane.closed", "pane.updated", "pane.agent_detected", "pane.focused", "workspace.created", "workspace.closed", "workspace.renamed"].map((type) => ({ type }));
   try {
     unsubscribe = await HerdrClient.subscribe(config.herdrSocket, subscriptions, () => scheduleRoster(), (reason) => {
@@ -95,6 +96,40 @@ async function ensureSubscribed(): Promise<void> {
   } catch (error) {
     console.error("herdr subscribe:", error instanceof Error ? error.message : error);
     setTimeout(() => void ensureSubscribed(), 5000);
+  }
+}
+
+/**
+ * Herdr reports an agent finishing (or blocking) only through pane.agent_status_changed, which
+ * needs a pane_id; pane.updated does not fire then. One subscription per agent pane, so a pane
+ * that vanishes (pane_not_found) does not take the others down.
+ */
+const statusWatches = new Map<string, () => void>();
+
+function watchStatuses(roster: Roster): void {
+  const agents = new Set(roster.panes.filter((p) => p.agent).map((p) => p.pane_id));
+  for (const [paneId, close] of statusWatches) {
+    if (agents.has(paneId)) continue;
+    statusWatches.delete(paneId);
+    close();
+  }
+  for (const paneId of agents) {
+    if (statusWatches.has(paneId)) continue;
+    let close = () => {};
+    const watch = () => close();
+    statusWatches.set(paneId, watch);
+    const dropped = (reason: string) => {
+      if (statusWatches.get(paneId) !== watch) return; // closed on purpose
+      statusWatches.delete(paneId);
+      // a closed pane also sends pane.closed; anything else, re-read and subscribe again
+      if (reason !== "pane_not_found") setTimeout(() => scheduleRoster(), 5000);
+    };
+    HerdrClient.subscribe(config.herdrSocket, [{ type: "pane.agent_status_changed", pane_id: paneId }], () => scheduleRoster(), dropped)
+      .then((end) => {
+        close = end;
+        if (statusWatches.get(paneId) !== watch) end(); // the pane left while connecting
+      })
+      .catch((error) => dropped(error instanceof Error ? error.message : String(error)));
   }
 }
 
