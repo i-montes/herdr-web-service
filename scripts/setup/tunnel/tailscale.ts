@@ -80,8 +80,10 @@ export async function ensureOperator(bin: string, run: Runner = defaultRun, plat
 }
 
 export async function ensureFunnel(port: number, bin: string, run: Runner = defaultRun): Promise<string> {
+  console.log("Activando Tailscale Funnel. Si Tailscale muestra un enlace para habilitarlo en tu tailnet, ábrelo: seguirá solo.");
   for (;;) {
-    const r = await run([bin, "funnel", "--bg", String(port)]);
+    // tee: recent CLIs print the enable link and wait for it instead of exiting
+    const r = await run([bin, "funnel", "--bg", String(port)], { tee: true });
     if (r.code === 0) break;
     const out = `${r.stdout}\n${r.stderr}`;
     const link = enableLinkFrom(out);

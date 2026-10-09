@@ -172,3 +172,13 @@ test("ensureLoggedIn logs in without `up`, which refuses when the host has non-d
   expect(calls.some((argv) => argv.at(-1) === "login")).toBe(true);
   expect(calls.some((argv) => argv.includes("up"))).toBe(false);
 });
+
+test("ensureFunnel shows tailscale's output: it may wait on an enable link instead of exiting", async () => {
+  const opts: ({ inherit?: boolean; tee?: boolean } | undefined)[] = [];
+  const run = async (argv: string[], o?: { inherit?: boolean; tee?: boolean }) => {
+    if (argv.includes("funnel")) opts.push(o);
+    return { code: 0, stdout: argv.includes("status") ? STATUS : "", stderr: "" };
+  };
+  await ensureFunnel(7340, "tailscale", run);
+  expect(opts).toEqual([{ tee: true }]);
+});
