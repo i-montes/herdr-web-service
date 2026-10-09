@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "bun run --parallel dev:server dev:web",
     "dev:server": "DEV_ORIGIN=http://localhost:5173 bun --watch server/index.ts",
-    "dev:web": "vite --config web/vite.config.ts",
-    "build": "vite build --config web/vite.config.ts",
+    "dev:web": "bun --bun vite --config web/vite.config.ts",
+    "build": "bun --bun vite build --config web/vite.config.ts",
     "start": "bun server/index.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun --bun tsc --noEmit",
     "test": "bun test"
   },
   "dependencies": {
