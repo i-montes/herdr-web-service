@@ -110,6 +110,26 @@ export interface ChatSnapshot {
   usage?: AgentUsage | null;
   /** how the transcript was found: reported by Herdr's integration, or guessed from the folder */
   source: "herdr" | "guess";
+  /** what the agent has running besides its own turn: subagents, background commands, monitors */
+  tasks: RunningTask[];
+}
+
+/**
+ * Something the agent started that has not finished yet: why it may say "working" while its own
+ * turn is idle, or sit idle while work goes on.
+ */
+export interface RunningTask {
+  id: string;
+  kind: "agent" | "command" | "monitor";
+  /** what it is for: the subagent's or the command's description, the monitor's */
+  label: string;
+  /** the command behind it, or the subagent's type */
+  detail: string | null;
+  /** launched in the background (the agent goes on); false: its turn waits for it */
+  background: boolean;
+  started_at: string | null;
+  /** a monitor's latest event */
+  last_event: string | null;
 }
 
 /** a choice the agent's terminal is waiting on (permission, question, trust prompt) */

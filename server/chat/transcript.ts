@@ -5,7 +5,7 @@
  * completed when their result arrives in a later line. Internal lines (thinking, reminders,
  * local commands, subagent sidechains, meta and compact summaries) are left out.
  */
-import type { ChatItem, ChatSnapshot, PlanStatus, ToolDetail } from "../../shared/protocol.ts";
+import type { ChatItem, ChatSnapshot, PlanStatus, RunningTask, ToolDetail } from "../../shared/protocol.ts";
 import { tildePath } from "../herdr/roster.ts";
 
 const MAX_OUTPUT = 6000;
@@ -38,7 +38,32 @@ function taskNotice(text: string): string | null {
   if (!/^\s*<task-notification>/.test(text)) return null;
   const summary = /<summary>([\s\S]*?)<\/summary>/.exec(text)?.[1]?.trim();
   const status = /<status>([^<]*)<\/status>/.exec(text)?.[1]?.trim();
-  return [summary || "Background task", status && status !== "completed" ? `(${status})` : ""].filter(Boolean).join(" ");
+  // a monitor sends one notice per event, all with the same summary: the event tells them apart
+  const event = /<event>([\s\S]*?)<\/event>/.exec(text)?.[1]?.trim();
+  return [summary || "Background task", event ? `— ${clip(event, 200)}` : "", status && status !== "completed" ? `(${status})` : ""].filter(Boolean).join(" ");
+}
+
+/**
+ * A task notice's task id, whether it ends the task (only final notices carry a <status>; a
+ * monitor also sends one per event, without it) and the event a monitor reported.
+ */
+function taskNotification(text: string): { id: string; done: boolean; event: string | null } | null {
+  if (!/^\s*<task-notification>/.test(text)) return null;
+  const id = /<task-id>([^<]*)<\/task-id>/.exec(text)?.[1]?.trim();
+  if (!id) return null;
+  return { id, done: /<status>/.test(text), event: /<event>([\s\S]*?)<\/event>/.exec(text)?.[1]?.trim() ?? null };
+}
+
+const truthy = (value: unknown) => value === true || value === "true";
+
+/**
+ * A command line's gist for a name: setup steps (`cd …`, `VAR=…`) dropped, the step that does the
+ * work kept. `S=/tmp/x; cd ~/app && PORT=1 bun server.ts` → `bun server.ts`.
+ */
+export function commandGist(command: string): string {
+  const line = command.split("\n")[0] ?? "";
+  const steps = line.split(/\s*(?:&&|;)\s*/).map((step) => step.replace(/^(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s*)+/, "").trim());
+  return steps.filter((step) => step && !/^cd(?:\s|$)/.test(step)).pop() ?? line.trim();
 }
 
 /** what a user string shows: reminders stripped, pasted blocks unwrapped; null for Claude Code's own bookkeeping */
@@ -100,6 +125,12 @@ export class Transcript {
   private tools = new Map<string, number>();
   private model: string | null = null;
   private queued: string[] = [];
+  /** what is still running, by task id (a tool_use id until a background launch reports its own) */
+  private running = new Map<string, RunningTask>();
+  /** finished subagents: a SendMessage to one resumes it */
+  private finished = new Map<string, RunningTask>();
+  /** TaskStop calls waiting for their result: tool_use id → the task it stops */
+  private stops = new Map<string, string>();
 
   constructor(private readonly home: string) {}
 
@@ -134,6 +165,7 @@ export class Transcript {
 
     if (type === "user") {
       // Claude Code records a background task's completion as a user line: it is a notice
+      if (typeof content === "string") this.notified(content);
       const notice = typeof content === "string" ? taskNotice(content) : null;
       if (notice || (o["origin"] as Raw | undefined)?.["kind"] === "task-notification") {
         this.items.push({ kind: "divider", id, text: `Background task: ${notice ?? "finished"}` });
@@ -174,7 +206,7 @@ export class Transcript {
         const text = str(block["text"]).trim();
         if (text) this.items.push({ kind: "assistant", id: blockId, text, at });
       } else if (block["type"] === "tool_use") {
-        this.toolUse(str(block["id"]) || blockId, str(block["name"]), (block["input"] ?? {}) as Raw);
+        this.toolUse(str(block["id"]) || blockId, str(block["name"]), (block["input"] ?? {}) as Raw, at);
       }
     });
   }
@@ -185,6 +217,8 @@ export class Transcript {
    */
   private queue(id: string, operation: string, content: string, reason: string, at: string | null): void {
     if (operation === "enqueue") {
+      // a task notice is queued the moment it arrives, often well before it reaches the conversation
+      this.notified(content);
       // only what the person typed waits in the visible queue, not task notices
       if (userText(content)) this.queued.push(content);
       return;
@@ -227,7 +261,8 @@ export class Transcript {
     return true;
   }
 
-  private toolUse(toolId: string, name: string, input: Raw): void {
+  private toolUse(toolId: string, name: string, input: Raw, at: string | null): void {
+    this.track(toolId, name, input, at);
     if (name === "TodoWrite") {
       const todos = Array.isArray(input["todos"]) ? (input["todos"] as Raw[]) : [];
       const items = todos.map((t) => ({
@@ -296,6 +331,8 @@ export class Transcript {
 
   private complete(toolId: string, block: Raw, result: unknown): void {
     const index = this.tools.get(toolId);
+    const tool = index === undefined ? undefined : this.items[index];
+    this.settle(toolId, block["is_error"] === true, result, tool?.kind === "tool" ? tool.summary : "");
     if (index === undefined) return;
     const item = this.items[index]!;
     const text = resultText(block["content"]);
@@ -308,12 +345,74 @@ export class Transcript {
     else if (item.kind === "question") this.items[index] = { ...item, answer: clip(text, 1000) };
   }
 
+  /** a tool call that starts something lasting: subagents and monitors from the call itself */
+  private track(toolId: string, name: string, input: Raw, at: string | null): void {
+    if (name === "TaskStop") {
+      const id = str(input["task_id"]) || str(input["shell_id"]);
+      if (id) this.stops.set(toolId, id);
+      return;
+    }
+    if (name === "SendMessage") {
+      const resumed = this.finished.get(str(input["to"]));
+      if (resumed) {
+        this.finished.delete(resumed.id);
+        this.running.set(resumed.id, { ...resumed, started_at: at });
+      }
+      return;
+    }
+    const base = { id: toolId, started_at: at, last_event: null };
+    const command = (str(input["command"]).split("\n")[0] ?? "").slice(0, 300) || null;
+    if (name === "Agent" || name === "Task") this.running.set(toolId, { ...base, kind: "agent", label: str(input["description"]) || "Subagent", detail: str(input["subagent_type"]) || null, background: truthy(input["run_in_background"]) });
+    else if (name === "Monitor") this.running.set(toolId, { ...base, kind: "monitor", label: str(input["description"]) || "Monitor", detail: command, background: true });
+    else if (name === "Bash" && truthy(input["run_in_background"])) this.running.set(toolId, { ...base, kind: "command", label: str(input["description"]) || commandGist(str(input["command"])) || "Background command", detail: command, background: true });
+  }
+
+  /**
+   * A tool result: a foreground subagent is done, a background launch moves to the task id it
+   * reports (a command sent to the background with ctrl+b reports one too), a TaskStop ends its task.
+   */
+  private settle(toolId: string, error: boolean, result: unknown, summary: string): void {
+    const stop = this.stops.get(toolId);
+    if (stop !== undefined) {
+      this.stops.delete(toolId);
+      if (!error) this.end(stop);
+      return;
+    }
+    const launched = this.running.get(toolId);
+    if (launched) this.running.delete(toolId);
+    if (error) return;
+    const r = (typeof result === "object" && result !== null ? result : {}) as Raw;
+    const taskId = (truthy(r["isAsync"]) && str(r["agentId"])) || str(r["backgroundTaskId"]) || str(r["taskId"]);
+    if (!taskId) return;
+    // a command sent to the background with ctrl+b was not launched as one: its card names it
+    const task: RunningTask = launched ?? { id: taskId, kind: "command", label: commandGist(summary) || "Background command", detail: summary || null, background: true, started_at: null, last_event: null };
+    this.running.set(taskId, { ...task, id: taskId, background: true });
+  }
+
+  /** a task notice: a final one ends its task, a monitor's event becomes its latest */
+  private notified(text: string): void {
+    const notice = taskNotification(text);
+    if (!notice) return;
+    if (notice.done) this.end(notice.id);
+    else if (notice.event) {
+      const task = this.running.get(notice.id);
+      if (task) this.running.set(notice.id, { ...task, last_event: clip(notice.event, 300) });
+    }
+  }
+
+  private end(id: string): void {
+    const task = this.running.get(id);
+    if (!task) return;
+    this.running.delete(id);
+    if (task.kind === "agent") this.finished.set(id, task);
+  }
+
   /** the last `limit` items; earlier plans give way to the latest one */
   snapshot(limit: number, version = ""): Omit<ChatSnapshot, "source"> {
     let lastPlan = -1;
     this.items.forEach((item, i) => item.kind === "plan" && (lastPlan = i));
     const visible = this.items.filter((item, i) => item.kind !== "plan" || i === lastPlan);
     const start = Math.max(0, visible.length - limit);
-    return { version, items: visible.slice(start), hidden: start, model: this.model, queued: [...this.queued] };
+    return { version, items: visible.slice(start), hidden: start, model: this.model, queued: [...this.queued], tasks: [...this.running.values()] };
   }
 }

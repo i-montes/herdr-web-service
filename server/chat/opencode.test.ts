@@ -64,3 +64,14 @@ test("the version changes when a part changes", () => {
   db.run("update part set data = ?, time_updated = ? where id = 'p1'", [JSON.stringify({ type: "text", text: "hola!" }), 99999]);
   expect(readOpencodeChat(db, "ses_1", "/Users/ana").version).not.toBe(before);
 });
+
+test("a subagent (task tool) still running is a running task; a finished one is not", () => {
+  session("ses_1", "/Users/ana/p", 1);
+  message("m1", "ses_1", { role: "assistant", modelID: "MiniMax-M3" });
+  part("p1", "m1", "ses_1", { type: "tool", tool: "task", state: { status: "completed", input: { description: "Explore", subagent_type: "explore" }, output: "done" } });
+  part("p2", "m1", "ses_1", { type: "tool", tool: "task", state: { status: "running", input: { description: "Review tests", subagent_type: "general" } } });
+  part("p3", "m1", "ses_1", { type: "tool", tool: "bash", state: { status: "running", input: { command: "bun test" } } });
+  expect(readOpencodeChat(db, "ses_1", "/Users/ana").tasks).toEqual([
+    { id: "p2", kind: "agent", label: "Review tests", detail: "general", background: false, started_at: expect.any(String), last_event: null },
+  ]);
+});

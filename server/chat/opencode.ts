@@ -7,7 +7,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { ChatItem, ChatSnapshot, PlanStatus, ToolDetail } from "../../shared/protocol.ts";
+import type { ChatItem, ChatSnapshot, PlanStatus, RunningTask, ToolDetail } from "../../shared/protocol.ts";
 import { tildePath } from "../herdr/roster.ts";
 import type { PaneSessionRef } from "./store.ts";
 import { CHAT_LIMIT } from "./store.ts";
@@ -162,6 +162,7 @@ export function readOpencodeChat(db: Database, sessionId: string, home: string):
   }
 
   const items: ChatItem[] = [];
+  const tasks: RunningTask[] = [];
   let model: string | null = null;
   for (const m of messages) {
     const data = parse(m.data);
@@ -183,7 +184,14 @@ export function readOpencodeChat(db: Database, sessionId: string, home: string):
         const text = str(p.data["text"]).trim();
         if (text && p.data["synthetic"] !== true) items.push({ kind: "assistant", id: p.id, text, at });
       } else if (type === "tool") {
-        items.push(toolItem(p.id, str(p.data["tool"]), (p.data["state"] ?? {}) as Raw, home));
+        const state = (p.data["state"] ?? {}) as Raw;
+        const item = toolItem(p.id, str(p.data["tool"]), state, home);
+        items.push(item);
+        // a subagent (task tool) still running is something this turn waits on
+        if (str(p.data["tool"]) === "task" && item.kind === "tool" && item.state === "running") {
+          const input = (state["input"] ?? {}) as Raw;
+          tasks.push({ id: p.id, kind: "agent", label: item.summary || "Subagent", detail: str(input["subagent_type"]) || null, background: false, started_at: at, last_event: null });
+        }
       } else if (type === "compaction") {
         items.push({ kind: "divider", id: p.id, text: "Conversation compacted" });
       }
@@ -195,5 +203,5 @@ export function readOpencodeChat(db: Database, sessionId: string, home: string):
   items.forEach((item, i) => item.kind === "plan" && (lastPlan = i));
   const visible = items.filter((item, i) => item.kind !== "plan" || i === lastPlan);
   const start = Math.max(0, visible.length - CHAT_LIMIT);
-  return { version, items: visible.slice(start), hidden: start, model, queued: [] };
+  return { version, items: visible.slice(start), hidden: start, model, queued: [], tasks };
 }

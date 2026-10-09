@@ -6,6 +6,7 @@ import { AgentTile } from "./AgentTile.tsx";
 import { ApiFailure, api } from "./api.ts";
 import { agentLook } from "./home.ts";
 import { Icon } from "./Home.tsx";
+import { RunningTasks } from "./RunningTasks.tsx";
 
 const POLL_MS = 1500;
 const MAX_IMAGE = 10 * 1024 * 1024;
@@ -367,6 +368,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
               Jump to bottom
             </button>
           )}
+          <RunningTasks tasks={chat?.tasks ?? []} />
           {error && <p role="alert" className="text-sm text-danger-ink">{error}</p>}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2" aria-label="Attached images">

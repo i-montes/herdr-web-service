@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Transcript } from "./transcript.ts";
+import { Transcript, commandGist } from "./transcript.ts";
 
 const HOME = "/Users/ana";
 const line = (o: unknown) => JSON.stringify(o);
@@ -154,4 +154,73 @@ test("background task notices are not user messages; pasted blocks are unwrapped
     { kind: "user", text: "look at this\n\npasted line" },
   ]);
   expect(snap.queued).toEqual([]);
+});
+
+const notice = (id: string, body: string) => `<task-notification>\n<task-id>${id}</task-id>\n${body}\n</task-notification>`;
+const running = (t: Transcript) => t.snapshot(100).tasks.map((x) => `${x.kind}${x.background ? "(bg)" : ""}:${x.id}:${x.label}${x.last_event ? `:${x.last_event}` : ""}`);
+
+test("running tasks: a background subagent runs from its launch until its final notice", () => {
+  const t = feed([assistant([{ type: "tool_use", id: "t1", name: "Agent", input: { description: "Translate the web", subagent_type: "general-purpose", prompt: "…", run_in_background: "true" } }])]);
+  expect(running(t)).toEqual(["agent(bg):t1:Translate the web"]);
+  t.feed(user([{ type: "tool_result", tool_use_id: "t1", content: "Async agent launched" }], { toolUseResult: { isAsync: true, status: "async_launched", agentId: "a42" } }));
+  expect(running(t)).toEqual(["agent(bg):a42:Translate the web"]);
+  expect(t.snapshot(100).tasks[0]).toMatchObject({ detail: "general-purpose" });
+  // the notice is queued first and reaches the conversation later: either one ends it, once
+  t.feed(line({ type: "queue-operation", operation: "enqueue", content: notice("a42", "<status>completed</status>\n<summary>Agent finished</summary>") }));
+  expect(running(t)).toEqual([]);
+  t.feed(user(notice("a42", "<status>completed</status>")));
+  expect(running(t)).toEqual([]);
+  // SendMessage resumes it until its next final notice
+  t.feed(assistant([{ type: "tool_use", id: "t2", name: "SendMessage", input: { to: "a42", message: "one more thing" } }]));
+  expect(running(t)).toEqual(["agent(bg):a42:Translate the web"]);
+});
+
+test("running tasks: a foreground subagent holds the turn until its result", () => {
+  const t = feed([assistant([{ type: "tool_use", id: "t1", name: "Agent", input: { description: "Search the code" } }])]);
+  expect(running(t)).toEqual(["agent:t1:Search the code"]);
+  t.feed(user([{ type: "tool_result", tool_use_id: "t1", content: "found it" }], { toolUseResult: { status: "completed", agentId: "a1" } }));
+  expect(running(t)).toEqual([]);
+});
+
+test("running tasks: background commands end with their notice or a TaskStop; ctrl+b counts too", () => {
+  const t = feed([
+    assistant([{ type: "tool_use", id: "t1", name: "Bash", input: { command: "bun run dev", description: "Dev server", run_in_background: true } }]),
+    user([{ type: "tool_result", tool_use_id: "t1", content: "Command running in background with ID: b1" }], { toolUseResult: { backgroundTaskId: "b1" } }),
+    assistant([{ type: "tool_use", id: "t2", name: "Bash", input: { command: "bun test --watch" } }]),
+    user([{ type: "tool_result", tool_use_id: "t2", content: "moved to background" }], { toolUseResult: { backgroundTaskId: "b2" } }),
+  ]);
+  expect(running(t)).toEqual(["command(bg):b1:Dev server", "command(bg):b2:bun test --watch"]);
+  expect(t.snapshot(100).tasks[0]).toMatchObject({ detail: "bun run dev" });
+  // a TaskStop that fails stops nothing
+  t.feed(assistant([{ type: "tool_use", id: "t3", name: "TaskStop", input: { task_id: "b1" } }]));
+  t.feed(user([{ type: "tool_result", tool_use_id: "t3", content: "no such task", is_error: true }]));
+  expect(running(t)).toHaveLength(2);
+  t.feed(assistant([{ type: "tool_use", id: "t4", name: "TaskStop", input: { task_id: "b1" } }]));
+  t.feed(user([{ type: "tool_result", tool_use_id: "t4", content: "Successfully stopped task: b1" }]));
+  t.feed(user(notice("b2", "<status>completed</status>")));
+  expect(running(t)).toEqual([]);
+});
+
+test("running tasks: a monitor shows its latest event until its stream ends; a failed launch never runs", () => {
+  const t = feed([
+    assistant([{ type: "tool_use", id: "t1", name: "Monitor", input: { command: "tail -f app.log | grep ERROR", description: "errors in app.log" } }]),
+    user([{ type: "tool_result", tool_use_id: "t1", content: "Monitor started" }], { toolUseResult: { taskId: "m1" } }),
+    line({ type: "queue-operation", operation: "enqueue", content: notice("m1", '<summary>Monitor event: "errors in app.log"</summary>\n<event>ERROR db timeout</event>') }),
+    assistant([{ type: "tool_use", id: "t2", name: "Agent", input: { description: "Never ran", run_in_background: true } }]),
+    user([{ type: "tool_result", tool_use_id: "t2", content: "denied", is_error: true }]),
+  ]);
+  expect(running(t)).toEqual(["monitor(bg):m1:errors in app.log:ERROR db timeout"]);
+  t.feed(line({ type: "queue-operation", operation: "enqueue", content: notice("m1", "<status>completed</status>") }));
+  expect(running(t)).toEqual([]);
+});
+
+test("a command's gist drops the setup steps", () => {
+  expect(commandGist("S=/tmp/x; cd /home/ana/app && PORT=1 HOST='a b' bun server.ts > log 2>&1")).toBe("bun server.ts > log 2>&1");
+  expect(commandGist("bun run dev\n# more")).toBe("bun run dev");
+  expect(commandGist("cd /tmp")).toBe("cd /tmp");
+});
+
+test("each monitor event shows in its notice", () => {
+  const t = feed([user(notice("m1", '<summary>Monitor event: "build"</summary>\n<event>step 3 ok</event>'))]);
+  expect(t.snapshot(100).items[0]).toMatchObject({ kind: "divider", text: 'Background task: Monitor event: "build" — step 3 ok' });
 });

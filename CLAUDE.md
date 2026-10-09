@@ -50,7 +50,11 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
     `store.ts` localiza el transcript (el `agent_session` que reporta la integración de Herdr
     —`herdr integration install claude`, hook `SessionStart`— o, si falta, el JSONL más reciente
     de la carpeta) solo dentro de `~/.claude/projects` y lo lee por incrementos; `transcript.ts`
-    lo convierte en mensajes, herramientas, diffs, plan y preguntas; `prompt.ts` lee de la
+    lo convierte en mensajes, herramientas, diffs, plan y preguntas, y lleva la cuenta de lo que el
+    agente dejó corriendo (`tasks`: subagentes, comandos en background, monitores con su último
+    evento): nace con la tool (o con el `agentId`/`backgroundTaskId`/`taskId` de su resultado) y
+    acaba con su `<task-notification>` con `<status>` o un `TaskStop`; la web lo muestra en la
+    pestaña "N running" sobre el input (`RunningTasks.tsx`). `prompt.ts` lee de la
     pantalla el menú que espera el agente (permisos, preguntas, /model, el deslizador de /effort)
     y lo responde con flechas + Enter. Los comandos de barra se escriben con `pane.send_input`
     (`agent.prompt` los rechaza). `opencode.ts` lee las sesiones de OpenCode de su SQLite
