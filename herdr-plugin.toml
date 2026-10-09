@@ -8,32 +8,32 @@ platforms = ["linux", "macos"]
 # Build runs only on `herdr plugin install` (GitHub). `herdr plugin link` skips it:
 # run `bun install && bun run build` yourself in a local checkout.
 [[build]]
-command = ["bun", "install", "--frozen-lockfile"]
+command = ["sh", "scripts/bun.sh", "install", "--frozen-lockfile"]
 
 [[build]]
-command = ["bun", "run", "build"]
+command = ["sh", "scripts/bun.sh", "run", "build"]
 
 # One-shot after every Herdr start: bring the server up if it is not already answering.
 [[startup]]
-command = ["bun", "scripts/plugin.ts", "start"]
+command = ["sh", "scripts/bun.sh", "scripts/plugin.ts", "start"]
 
 [[actions]]
 id = "start"
 title = "Web: start server"
 contexts = ["global", "workspace"]
-command = ["bun", "scripts/plugin.ts", "start"]
+command = ["sh", "scripts/bun.sh", "scripts/plugin.ts", "start"]
 
 [[actions]]
 id = "stop"
 title = "Web: stop server"
 contexts = ["global", "workspace"]
-command = ["bun", "scripts/plugin.ts", "stop"]
+command = ["sh", "scripts/bun.sh", "scripts/plugin.ts", "stop"]
 
 [[actions]]
 id = "status"
 title = "Web: status"
 contexts = ["global", "workspace"]
-command = ["bun", "scripts/plugin.ts", "status"]
+command = ["sh", "scripts/bun.sh", "scripts/plugin.ts", "status"]
 
 [[actions]]
 id = "setup"
@@ -45,7 +45,7 @@ command = ["sh", "-c", "exec \"${HERDR_BIN_PATH:-herdr}\" plugin pane open --plu
 id = "uninstall"
 title = "Web: uninstall (service and tunnel; keeps password and config)"
 contexts = ["global", "workspace"]
-command = ["bun", "scripts/plugin.ts", "uninstall"]
+command = ["sh", "scripts/bun.sh", "scripts/plugin.ts", "uninstall"]
 
 [[panes]]
 id = "setup"
@@ -53,4 +53,4 @@ title = "Herdr Web Service setup"
 placement = "popup"
 width = "80%"
 height = "80%"
-command = ["bun", "scripts/plugin.ts", "setup"]
+command = ["sh", "scripts/bun.sh", "scripts/plugin.ts", "setup"]

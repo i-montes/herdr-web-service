@@ -27,7 +27,9 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
 
 ## Estructura
 
-- `herdr-plugin.toml` — manifiesto (build, startup, acciones, pane popup `setup`).
+- `herdr-plugin.toml` — manifiesto (build, startup, acciones, pane popup `setup`). Sus comandos
+  pasan por `scripts/bun.sh`: Herdr los lanza con el PATH de su servidor, que suele no tener
+  `~/.bun/bin` (el instalador de Bun solo lo añade al rc de la shell).
 - `server/` — `Bun.serve`: `index.ts` (rutas, WS, fan-out), `herdr/client.ts` (NDJSON sobre el
   socket Unix de Herdr), `config.ts` (dirs y `.env` del plugin).
   - `access.ts` — política por petición (funciones puras sobre `RequestFacts`): proxy de
