@@ -14,6 +14,9 @@ bun test
 bun scripts/plugin.ts start|stop|status|setup|set-password|uninstall|url
 ```
 
+CI (`.github/workflows/ci.yml`): typecheck, tests y build en Linux y macOS en cada push a `main` y
+en cada pull request, con Bun fijado a la versión de desarrollo.
+
 `bun run dev` arranca el servidor con `DEV_ORIGIN=http://localhost:5173` (el origen de Vite pasa
 la política de Origin). `set-password` no recibe argumentos: pide la password sin eco (o lee una
 línea de un pipe).

@@ -1,5 +1,7 @@
 # Herdr Web Service
 
+[![CI](https://github.com/i-montes/herdr-web-service/actions/workflows/ci.yml/badge.svg)](https://github.com/i-montes/herdr-web-service/actions/workflows/ci.yml)
+
 A web client for [Herdr](https://herdr.dev): talk to your **Claude Code** and **OpenCode** agents
 like in a chat, from the browser or your phone, with its own password and HTTPS. It runs on your
 computer, on your home network or on a VPS, and installs with a single command.
