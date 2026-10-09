@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Roster } from "../../shared/protocol.ts";
-import { _resetPrompts, launchSession, parseNewSession, readyPrompts, type Requester } from "./launch.ts";
+import { _resetPrompts, agentName, launchSession, parseNewSession, readyPrompts, type Requester } from "./launch.ts";
 import { uploadDir } from "../uploads.ts";
 
 const home = realpathSync(mkdtempSync(join(tmpdir(), "hw-launch-")));
@@ -141,4 +141,30 @@ test("a shell that never gets ready gives up after the timeout", async () => {
   const parsed = parseNewSession({ cwd: "~/p/app", kind: "claude" }, home);
   if (!parsed.ok) throw new Error(parsed.error);
   await expect(launchSession(h, parsed.value, roster, home, { wait: () => Bun.sleep(5), timeoutMs: 50 })).rejects.toThrow("not an available shell");
+});
+
+test("agent names follow Herdr's rule: lowercase letter first, [a-z0-9_-], at most 32", () => {
+  expect(agentName("~-claude", "claude")).toBe("claude");
+  expect(agentName("Mi Proyecto Ñandú", "claude")).toBe("mi-proyecto-nandu");
+  expect(agentName("api.v2 (prod)", "opencode")).toBe("api-v2-prod");
+  expect(agentName("123", "opencode")).toBe("opencode");
+  expect(agentName("a".repeat(40) + "-x", "claude")).toBe("a".repeat(32));
+  for (const n of ["~-claude", "Mi Proyecto Ñandú", "a".repeat(50), "---", "ok_name-1"]) expect(agentName(n, "claude")).toMatch(/^[a-z][a-z0-9_-]{0,31}$/);
+});
+
+test("the tab keeps the typed name; the agent gets a valid one", async () => {
+  const h = fake();
+  const parsed = parseNewSession({ cwd: "~/p/app", kind: "claude", name: "~ Mi sesión" }, home);
+  if (!parsed.ok) throw new Error(parsed.error);
+  await launchSession(h, parsed.value, roster, home, noWait);
+  expect(h.calls.find(([m]) => m === "tab.create")?.[1]).toMatchObject({ label: "~ Mi sesión" });
+  expect(h.calls.find(([m]) => m === "agent.start")?.[1]).toMatchObject({ name: "mi-sesion" });
+});
+
+test("a name already in use gets a numeric suffix", async () => {
+  const h = slowShell(2, "agent name app-claude is already used; candidates: pane_id=w1:p1");
+  const parsed = parseNewSession({ cwd: "~/p/app", kind: "claude" }, home);
+  if (!parsed.ok) throw new Error(parsed.error);
+  await launchSession(h, parsed.value, roster, home, noWait);
+  expect(h.calls.filter(([m]) => m === "agent.start").map(([, p]) => p["name"])).toEqual(["app-claude", "app-claude-2", "app-claude-3"]);
 });

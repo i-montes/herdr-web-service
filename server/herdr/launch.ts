@@ -80,19 +80,46 @@ const pendingPrompts = new Map<string, string>();
 /** how long a new pane may take to have a shell an agent can start in (slow shells on a VPS) */
 const SHELL_READY_MS = 10_000;
 
+const AGENT_NAME_MAX = 32;
+
 /**
- * `agent.start` on a pane created a moment ago: Herdr refuses until the pane's shell is up
- * ("is not an available shell", ~0.5 s on a small VPS), so that one error is retried.
+ * Herdr's agent names: a lowercase letter first, then [a-z0-9_-], 1–32 characters, unique among
+ * live agents. The session's own name (any text) stays on its tab.
  */
-async function startAgent(herdr: Requester, params: Record<string, unknown>, opts: LaunchOptions): Promise<void> {
+export function agentName(name: string, kind: SessionKind): string {
+  const slug = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^[^a-z]+/, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, AGENT_NAME_MAX)
+    .replace(/[-_]+$/, "");
+  return slug || kind;
+}
+
+const withSuffix = (base: string, n: number) => (n < 2 ? base : `${base.slice(0, AGENT_NAME_MAX - String(n).length - 1).replace(/[-_]+$/, "")}-${n}`);
+
+/**
+ * `agent.start` on a pane created a moment ago. Two refusals are retried: the pane's shell is not
+ * up yet ("is not an available shell", ~0.5 s on a small VPS), and the name is taken by another
+ * live agent ("is already used": the next one gets -2, -3...).
+ */
+async function startAgent(herdr: Requester, params: { name: string } & Record<string, unknown>, opts: LaunchOptions): Promise<void> {
   const deadline = Date.now() + opts.timeoutMs;
+  let suffix = 1;
   for (;;) {
     try {
-      await herdr.request("agent.start", params);
+      await herdr.request("agent.start", { ...params, name: withSuffix(params.name, suffix) });
       return;
     } catch (error) {
-      const notReady = error instanceof Error && error.message.includes("not an available shell");
-      if (!notReady || Date.now() >= deadline) throw error;
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("is already used") && suffix < 50) {
+        suffix++;
+        continue;
+      }
+      if (!message.includes("not an available shell") || Date.now() >= deadline) throw error;
       await opts.wait(200);
     }
   }
@@ -124,7 +151,7 @@ export async function launchSession(
   if (input.kind === "shell") {
     if (input.command) await herdr.request("pane.send_text", { pane_id, text: input.command + "\n" });
   } else {
-    await startAgent(herdr, { name: input.name, kind: input.kind, pane_id, args: agentArgs(input.kind, input.permission) }, opts);
+    await startAgent(herdr, { name: agentName(input.name, input.kind), kind: input.kind, pane_id, args: agentArgs(input.kind, input.permission) }, opts);
     if (input.message) pendingPrompts.set(pane_id, input.message);
   }
   return { pane_id };
