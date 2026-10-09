@@ -1,13 +1,9 @@
 import { afterAll, beforeEach, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-// config.ts reads these at import time, so they must be set before any server module loads
-const stateDir = mkdtempSync(join(tmpdir(), "hwv-state-"));
-const configDir = mkdtempSync(join(tmpdir(), "hwv-config-"));
-process.env["HERDR_PLUGIN_STATE_DIR"] = stateDir;
-process.env["HERDR_PLUGIN_CONFIG_DIR"] = configDir;
+// tests/preload.ts points these at temp dirs before any server module loads
+const stateDir = process.env["HERDR_PLUGIN_STATE_DIR"]!;
 
 const mod = await import("./sessions.ts");
 const { createSession, sessionFromRequest, sessionCookie, revokeSession, listSessions, sessionAlive, hashToken, _setNow, _reload, SESSION_COOKIE, IDLE_DAYS, ABSOLUTE_DAYS } = mod;
@@ -23,11 +19,7 @@ beforeEach(() => {
   writeFileSync(file, "[]");
   _reload();
 });
-afterAll(() => {
-  _setNow(null);
-  rmSync(stateDir, { recursive: true, force: true });
-  rmSync(configDir, { recursive: true, force: true });
-});
+afterAll(() => _setNow(null));
 
 test("the file holds hashes, not tokens", () => {
   const { token } = createSession(new Request("http://x"), "1.2.3.4");

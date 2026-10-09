@@ -1,0 +1,4 @@
+[test]
+# Point the plugin's config/state dirs at temp folders before any test file loads config.ts,
+# so `bun test` never touches the real sessions.json, auth.json or .env.
+preload = ["./tests/preload.ts"]
