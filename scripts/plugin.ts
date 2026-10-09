@@ -6,7 +6,7 @@
  * `start` uses the service unit when one is installed; otherwise it spawns the server detached,
  * records its pid under HERDR_PLUGIN_STATE_DIR and waits for /api/health. `setup` runs the
  * interactive wizard (Herdr opens it in a popup pane): access mode, password, tunnel, service.
- * `uninstall` removes the service units and the tunnel, keeping the password and the .env. Herdr injects HERDR_SOCKET_PATH, HERDR_BIN_PATH and the plugin dirs.
+ * `uninstall` removes the service units, the tunnel and our Claude Code status line, keeping the password and the .env. Herdr injects HERDR_SOCKET_PATH, HERDR_BIN_PATH and the plugin dirs.
  */
 import { spawn } from "node:child_process";
 import { existsSync, openSync, writeFileSync } from "node:fs";
@@ -16,6 +16,7 @@ import { passwordConfigured } from "../server/auth/password.ts";
 import { recordedPid, stopLooseServer } from "./setup/loose.ts";
 import { askAndSetPassword } from "./setup/password.ts";
 import { restartUnit, stopUnit, uninstallUnit, unitInstalled } from "./setup/service.ts";
+import { removeStatusLine, statusLinePaths } from "./setup/statusline.ts";
 import { funnelServes, teardownTunnel } from "./setup/tunnel/index.ts";
 import { runUninstall } from "./setup/uninstall.ts";
 import { runWizard, SetupAborted } from "./setup/wizard.ts";
@@ -132,6 +133,7 @@ async function uninstall(): Promise<void> {
     stopLooseServer,
     funnelServes: (port) => funnelServes(port),
     teardownTunnel: (kind, port) => teardownTunnel(kind, port),
+    removeStatusLine: () => removeStatusLine(statusLinePaths(CONFIG_DIR)),
   });
   if (!ok) process.exit(1);
 }

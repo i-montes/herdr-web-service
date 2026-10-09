@@ -20,6 +20,7 @@ import { preflight, type PreflightResult } from "./preflight.ts";
 import {
   installUnit, restartUnit, stopUnit, uninstallUnit, unitInstalled, unitRunning, type Unit, type UnitParams,
 } from "./service.ts";
+import { installStatusLine, statusLineCommand, statusLinePaths, type InstallResult } from "./statusline.ts";
 import { renderSummary } from "./summary.ts";
 import { exposeArgs } from "./tunnel/portal.ts";
 import { funnelServes, setupTunnel, teardownTunnel, type TunnelKind, type TunnelResult } from "./tunnel/index.ts";
@@ -63,6 +64,8 @@ export interface WizardDeps {
   stopUnit: (u: Unit) => Promise<void>;
   restartUnit: (u: Unit) => Promise<void>;
   stopLooseServer: () => Promise<unknown>;
+  /** registers our Claude Code status line (context and plan usage for the web chat) */
+  installStatusLine: () => InstallResult;
   verifyHealth: (url: string) => Promise<HealthResult>;
   /** runs `cleanup` on SIGINT/SIGHUP/SIGTERM, then exits 130; returns the unsubscribe */
   onInterrupt: (cleanup: () => Promise<void>) => () => void;
@@ -120,6 +123,11 @@ export function defaultDeps(): WizardDeps {
     stopUnit: (u) => stopUnit(u),
     restartUnit: (u) => restartUnit(u),
     stopLooseServer,
+    installStatusLine: () =>
+      installStatusLine(
+        statusLinePaths(CONFIG_DIR),
+        statusLineCommand({ bun: process.execPath, root: ROOT, stateDir: STATE_DIR, configDir: CONFIG_DIR }),
+      ),
     verifyHealth: (url) => verifyHealth(url),
     onInterrupt,
   };
@@ -161,6 +169,33 @@ async function lanHost(deps: WizardDeps, savedHost: string | undefined): Promise
     return ip;
   }
   throw new SetupAborted("No hay una dirección IPv4 de red local válida: conecta este equipo a la red y vuelve a intentarlo.");
+}
+
+/** Step 7b: never fatal, the server works without it (the web chat just shows no usage). */
+function statusLineStep(deps: WizardDeps): void {
+  let result: InstallResult;
+  try {
+    result = deps.installStatusLine();
+  } catch (error) {
+    deps.log(`No se pudo registrar la status line de Claude Code: ${(error as Error).message}`);
+    deps.log("El chat web no mostrará el contexto ni los límites del plan de Claude.");
+    return;
+  }
+  switch (result.status) {
+    case "installed":
+      return deps.log("Status line de Claude Code: instalada (contexto y límites del plan para el chat web)");
+    case "updated":
+      return deps.log("Status line de Claude Code: actualizada");
+    case "unchanged":
+      return deps.log("Status line de Claude Code: sin cambios");
+    case "chained":
+      return deps.log(`Status line de Claude Code: instalada; la que había (${result.previous}) se sigue mostrando delante`);
+    case "no-claude":
+      return deps.log("Claude Code no está instalado: el chat web no mostrará su contexto ni los límites del plan. Vuelve a ejecutar la configuración después de instalarlo.");
+    case "unreadable":
+      deps.log(`No se pudo leer ${result.detail}`);
+      return deps.log("Status line de Claude Code: sin instalar. Arregla el archivo y vuelve a ejecutar la configuración.");
+  }
 }
 
 export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void> {
@@ -314,6 +349,7 @@ export async function runWizard(deps: WizardDeps = defaultDeps()): Promise<void>
       log("Servidor reiniciado");
     }
     unsubscribe();
+    statusLineStep(deps);
 
     // 8. verification
     for (;;) {

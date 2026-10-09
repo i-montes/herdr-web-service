@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { readEnv } from "./env.ts";
 import type { TunnelKind, TunnelResult } from "./tunnel/index.ts";
 import type { Unit, UnitParams } from "./service.ts";
+import type { InstallResult } from "./statusline.ts";
 import { PUBLIC_IP, runWizard, SetupAborted, URL_CHANGE, type WizardDeps } from "./wizard.ts";
 
 let dir = "";
@@ -42,6 +43,7 @@ function harness(opts: {
   health?: ({ ok: true } | { ok: false; reason: string })[];
   lan?: string | null;
   installResult?: "installed" | "unchanged";
+  statusLine?: () => InstallResult;
 }): Harness {
   const calls: string[] = [];
   const confirms: string[] = [];
@@ -115,6 +117,10 @@ function harness(opts: {
     stopUnit: async (u) => void calls.push(`stop:${u}`),
     restartUnit: async (u) => void calls.push(`restart:${u}`),
     stopLooseServer: async () => void calls.push("stopLoose"),
+    installStatusLine: () => {
+      calls.push("statusline");
+      return opts.statusLine ? opts.statusLine() : { status: "installed" };
+    },
     verifyHealth: async (url) => {
       calls.push(`verify:${url}`);
       return health.shift() ?? { ok: true };
@@ -135,7 +141,7 @@ describe("runWizard", () => {
     expect(readEnv(envPath)).toEqual({ ACCESS_MODE: "local", HOST: "127.0.0.1", PORT: "7340", PUBLIC_URL: "http://localhost:7340" });
     expect(h.calls).toEqual([
       "choose:¿Desde dónde vas a usar el cliente web?:local", "password", "stopLoose", "install:server",
-      "verify:http://localhost:7340", "enter",
+      "statusline", "verify:http://localhost:7340", "enter",
     ]);
     expect(h.output()).toContain("http://localhost:7340");
   });
@@ -300,6 +306,41 @@ describe("runWizard", () => {
     const h = harness({ chooses: ["local"], health: [{ ok: false, reason: "x" }], answers: { "¿Reintentar?": false } });
     await expect(runWizard(h.deps)).rejects.toBeInstanceOf(SetupAborted);
     expect(h.calls).not.toContain("enter");
+  });
+
+  describe("Claude Code status line", () => {
+    test("someone else's status line is chained, and the summary says so", async () => {
+      const h = harness({ chooses: ["local"], statusLine: () => ({ status: "chained", previous: "~/bin/line.sh" }) });
+      await runWizard(h.deps);
+      expect(h.output()).toContain("~/bin/line.sh");
+    });
+
+    test("without Claude Code the wizard goes on and explains what is missing", async () => {
+      const h = harness({ chooses: ["local"], statusLine: () => ({ status: "no-claude" }) });
+      await runWizard(h.deps);
+      expect(h.output()).toContain("Claude Code no está instalado");
+      expect(h.calls).toContain("enter");
+    });
+
+    test("an unreadable settings.json is reported, not fatal", async () => {
+      const h = harness({ chooses: ["local"], statusLine: () => ({ status: "unreadable", detail: "/h/.claude/settings.json: bad" }) });
+      await runWizard(h.deps);
+      expect(h.output()).toContain("/h/.claude/settings.json: bad");
+      expect(h.calls).toContain("enter");
+    });
+
+    test("an error writing it is reported, not fatal", async () => {
+      const h = harness({
+        chooses: ["local"],
+        statusLine: () => {
+          throw new Error("EACCES");
+        },
+      });
+      await runWizard(h.deps);
+      expect(h.output()).toContain("EACCES");
+      expect(readEnv(envPath)).toMatchObject({ ACCESS_MODE: "local" });
+      expect(h.calls).toContain("enter");
+    });
   });
 
   describe("tunnel rollback (Funnel must never outlive a non-remote .env)", () => {

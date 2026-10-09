@@ -20,7 +20,7 @@ línea de un pipe).
 
 Verbos de `scripts/plugin.ts`: `start` (usa la unidad de servicio si existe; si no, servidor
 suelto con pid en el state dir), `stop`, `status`, `setup` (asistente), `set-password`,
-`uninstall` (quita túnel y unidades; conserva `auth.json` y `.env`), `url`.
+`uninstall` (quita túnel, unidades y la status line; conserva `auth.json` y `.env`), `url`.
 
 Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`.
 `herdr plugin link` no ejecuta `[[build]]`: tras cambios en `web/` hay que `bun run build`.
@@ -49,9 +49,11 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
     (`~/.local/share/opencode/opencode.db`, solo lectura); su integración de Herdr reporta el
     `ses_…` de cada panel.
     `usage.ts`: contexto y límites del plan (5 h y semana, con su reinicio) de Claude Code. Los
-    entrega a su status line: `scripts/statusline.ts` (registrado en `~/.claude/settings.json` →
-    `statusLine`) los guarda en `<state dir>/claude-status/<session_id>.json` y pinta
-    `ctx 62% · 5h 34% · sem 12%` al pie de la terminal.
+    entrega a su status line: `scripts/statusline.ts` (lo registra `setup` en `settings.json` →
+    `statusLine` de Claude Code) los guarda en `<state dir>/claude-status/<session_id>.json` y pinta
+    `ctx 62% · 5h 34% · sem 12%` al pie de la terminal. Si ya había otra status line, `setup` la
+    guarda en `<config dir>/claude-statusline.json` y la encadena (se ejecuta con la misma entrada y
+    su salida va delante); `uninstall` la restaura.
     `opencode-controls.ts`: modelo y variante (esfuerzo) de OpenCode y su uso (contexto % con el
     catálogo `~/.cache/opencode/models.json`, coste de sesión y de 7 días). Su diálogo de modelos
     no se puede leer (la fila elegida solo se marca con color): la web ofrece los modelos recientes
@@ -80,8 +82,9 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
 - `scripts/setup/` — asistente de `setup`: `wizard.ts` (flujo; todo efecto entra por `WizardDeps`
   para probarlo con fakes), `preflight.ts`, `env.ts` (lee/escribe `.env`), `network.ts` (IP LAN y
   URL canónica), `password.ts`, `service.ts` (unidades `systemd --user` / LaunchAgent: `server`
-  y `tunnel`), `loose.ts` (servidor suelto), `verify.ts` (health), `summary.ts` (URL, QR,
-  límites del modo), `uninstall.ts`.
+  y `tunnel`), `statusline.ts` (registra, encadena y restaura la status line de Claude Code),
+  `loose.ts` (servidor suelto), `verify.ts` (health), `summary.ts` (URL, QR, límites del modo),
+  `uninstall.ts`.
 - `scripts/setup/tunnel/` — `index.ts` (`setupTunnel`/`teardownTunnel`/`funnelServes`),
   `tailscale.ts` (Funnel), `portal.ts` (Portal; corre como unidad `tunnel`), `run.ts` (runner de
   procesos inyectable).

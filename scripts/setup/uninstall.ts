@@ -1,6 +1,10 @@
-/** `plugin.ts uninstall`: tunnel off, service units removed; the password and the .env stay. */
+/**
+ * `plugin.ts uninstall`: tunnel off, service units removed, Claude Code's status line put back;
+ * the password and the .env stay.
+ */
 import { readEnv } from "./env.ts";
 import type { Unit } from "./service.ts";
+import type { RemoveResult } from "./statusline.ts";
 import type { TunnelKind } from "./tunnel/index.ts";
 
 export interface UninstallDeps {
@@ -15,6 +19,7 @@ export interface UninstallDeps {
   /** read-only: Tailscale Funnel/serve proxies to this port now */
   funnelServes: (port: number) => Promise<boolean>;
   teardownTunnel: (kind: TunnelKind, port: number) => Promise<boolean>;
+  removeStatusLine: () => RemoveResult;
 }
 
 /** Returns false when something could not be undone (the output says what to run). */
@@ -45,6 +50,19 @@ export async function runUninstall(d: UninstallDeps): Promise<boolean> {
     d.log(`quitado: ${label}`);
   }
   if (await d.stopLooseServer()) d.log("parado: servidor suelto");
+
+  try {
+    const r = d.removeStatusLine();
+    if (r.status === "removed") d.log("quitado: status line de Claude Code");
+    else if (r.status === "restored") d.log(`restaurada: status line de Claude Code (${r.previous})`);
+    else if (r.status === "unreadable") {
+      ok = false;
+      d.log(`NO se pudo quitar la status line de Claude Code: ${r.detail}`);
+    }
+  } catch (error) {
+    ok = false;
+    d.log(`NO se pudo quitar la status line de Claude Code: ${(error as Error).message}`);
+  }
 
   d.log(`conservado: contraseña (${d.authFile}) y configuración (${d.envPath})`);
   d.log("Tailscale y Portal, si los usabas, siguen instalados.");

@@ -3,13 +3,16 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Unit } from "./service.ts";
+import type { RemoveResult } from "./statusline.ts";
 import { runUninstall, type UninstallDeps } from "./uninstall.ts";
 
 let dir = "";
 beforeEach(() => (dir = mkdtempSync(join(tmpdir(), "unin-"))));
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function harness(opts: { env?: string; units?: Unit[]; serving?: number[]; teardownOk?: boolean; loose?: boolean }) {
+function harness(opts: {
+  env?: string; units?: Unit[]; serving?: number[]; teardownOk?: boolean; loose?: boolean; statusLine?: () => RemoveResult;
+}) {
   const envPath = join(dir, ".env");
   if (opts.env !== undefined) writeFileSync(envPath, opts.env);
   const calls: string[] = [];
@@ -28,6 +31,7 @@ function harness(opts: { env?: string; units?: Unit[]; serving?: number[]; teard
       units.delete(u);
     },
     stopLooseServer: async () => (calls.push("stopLoose"), opts.loose ?? false),
+    removeStatusLine: () => (opts.statusLine ? opts.statusLine() : { status: "absent" }),
     funnelServes: async (p) => serving.has(p),
     teardownTunnel: async (k, p) => {
       calls.push(`teardown:${k}:${p}`);
@@ -71,4 +75,26 @@ test("nothing configured: no teardown, units removed, kept files listed", async 
   expect(h.calls).toEqual(["stop:tunnel", "uninstall:tunnel", "stop:server", "uninstall:server", "stopLoose"]);
   expect(h.output()).toContain("conservado:");
   expect(h.output()).toContain("servidor suelto");
+});
+
+test("our status line is taken out; a chained one is put back", async () => {
+  const removed = harness({ statusLine: () => ({ status: "removed" }) });
+  expect(await runUninstall(removed.deps)).toBe(true);
+  expect(removed.output()).toContain("quitado: status line de Claude Code");
+
+  const restored = harness({ statusLine: () => ({ status: "restored", previous: "~/bin/line.sh" }) });
+  await runUninstall(restored.deps);
+  expect(restored.output()).toContain("restaurada: status line de Claude Code (~/bin/line.sh)");
+});
+
+test("a status line problem does not stop the uninstall", async () => {
+  const h = harness({
+    units: ["server"],
+    statusLine: () => {
+      throw new Error("EACCES");
+    },
+  });
+  expect(await runUninstall(h.deps)).toBe(false);
+  expect(h.calls).toContain("uninstall:server");
+  expect(h.output()).toContain("EACCES");
 });
