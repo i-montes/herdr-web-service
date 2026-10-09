@@ -1,4 +1,4 @@
-import type { ApiError, ChatResponse, Roster, SessionInfo } from "../../shared/protocol.ts";
+import type { ApiError, ChatResponse, Roster, SessionInfo, SignIn } from "../../shared/protocol.ts";
 
 /** A non-2xx answer: `code` is the server's error code, `retryAfter` the seconds a 429 asks to wait */
 export class ApiFailure extends Error {
@@ -68,4 +68,7 @@ export const api = {
   pushKey: () => call<{ key: string }>("/api/push/key"),
   pushSubscribe: (subscription: PushSubscriptionJSON) => call<void>("/api/push/subscribe", post(subscription)),
   pushUnsubscribe: (endpoint: string) => call<void>("/api/push/unsubscribe", post({ endpoint })),
+  signIns: () => call<SignIn[]>("/api/auth/sessions"),
+  signOutDevice: (id: string) => call<void>("/api/auth/sessions/revoke", post({ id })),
+  signOutOthers: () => call<void>("/api/auth/sessions/revoke-others", { method: "POST" }),
 };

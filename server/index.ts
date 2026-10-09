@@ -9,10 +9,11 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { ChatResponse, ClientFrame, Notice, PanePrompt, Roster, ServerFrame, SessionInfo } from "../shared/protocol.ts";
+import type { ChatResponse, ClientFrame, Notice, PanePrompt, Roster, ServerFrame, SessionInfo, SignIn } from "../shared/protocol.ts";
 import { passwordConfigured, verifyPassword } from "./auth/password.ts";
 import { handleLogin } from "./auth/login.ts";
-import { clearedSessionCookie, createSession, revokeSession, sessionAlive, sessionCookie, sessionFromRequest } from "./auth/sessions.ts";
+import { clearedSessionCookie, createSession, listSessions, revokeSession, sessionAlive, sessionCookie, sessionFromRequest } from "./auth/sessions.ts";
+import { PUBLIC_ID_LENGTH, deviceName, publicId } from "./auth/devices.ts";
 import { clientAddress, factsFrom, hostAllowed, isSecure, loginTransportAllowed, originAllowed, securityHeaders, type AccessConfig, type RequestFacts } from "./access.ts";
 import { STATE_DIR, config } from "./config.ts";
 import { HerdrClient, HerdrError } from "./herdr/client.ts";
@@ -29,7 +30,7 @@ import { opencodeCatalog, opencodeUsage, opencodeVariants, parseOpencodeFooter, 
 import { apiError, isRegularFile, json, withHeaders } from "./http.ts";
 import { socketsOfSession, staleSockets } from "./ws.ts";
 import { NoticeWatch } from "./notify.ts";
-import { addSubscription, liveSubscriptions, parseSubscription, removeSubscription, vapidKeys } from "./push/store.ts";
+import { addSubscription, liveSubscriptions, parseSubscription, removeSubscription, removeSubscriptionsOf, sessionsWithPush, vapidKeys } from "./push/store.ts";
 import { sendPush } from "./push/webpush.ts";
 
 const herdr = new HerdrClient(config.herdrSocket);
@@ -144,6 +145,13 @@ function watchStatuses(roster: Roster): void {
   }
 }
 
+/** a sign-in ends: forgotten, its open pages sent back to the password, its devices' pushes stopped */
+function endSignIn(idHash: string): void {
+  revokeSession(idHash);
+  removeSubscriptionsOf(idHash);
+  for (const ws of socketsOfSession(clients, idHash)) ws.close(1008, "signed out");
+}
+
 // --- notices: a toast in every open browser, a push to the devices not looking ---------------
 
 const noticeWatch = new NoticeWatch();
@@ -240,9 +248,29 @@ async function route(request: Request, facts: RequestFacts, server: import("bun"
     if (!session) return apiError("unauthorized", passwordConfigured() ? "sign in" : "run setup first", 401);
 
     if (pathname === "/api/auth/logout" && method === "POST") {
-      revokeSession(session.id_hash);
-      for (const ws of socketsOfSession(clients, session.id_hash)) ws.close(1008, "signed out");
+      endSignIn(session.id_hash);
       return new Response(null, { status: 204, headers: { "set-cookie": clearedSessionCookie() } });
+    }
+    // the devices list: every live sign-in, and signing out the others from here
+    if (pathname === "/api/auth/sessions" && method === "GET") {
+      const withPush = sessionsWithPush();
+      const list: SignIn[] = listSessions()
+        .map((s) => ({ id: publicId(s.id_hash), device: deviceName(s.user_agent), user_agent: s.user_agent, address: s.address, created_at: s.created_at, last_seen_at: s.last_seen_at, current: s.id_hash === session.id_hash, notifications: withPush.has(s.id_hash) }))
+        .sort((a, b) => Number(b.current) - Number(a.current) || b.last_seen_at - a.last_seen_at);
+      return json(list);
+    }
+    if (pathname === "/api/auth/sessions/revoke" && method === "POST") {
+      const body = (await readJson(request)) as { id?: unknown } | undefined;
+      const id = typeof body?.id === "string" && new RegExp(`^[0-9a-f]{${PUBLIC_ID_LENGTH}}$`).test(body.id) ? body.id : null;
+      const target = id ? listSessions().find((s) => s.id_hash.startsWith(id)) : undefined;
+      if (!target) return apiError("session_not_found", "no such sign-in", 404);
+      endSignIn(target.id_hash);
+      // signing out this very browser: its cookie goes too
+      return new Response(null, { status: 204, headers: target.id_hash === session.id_hash ? { "set-cookie": clearedSessionCookie() } : {} });
+    }
+    if (pathname === "/api/auth/sessions/revoke-others" && method === "POST") {
+      for (const s of listSessions()) if (s.id_hash !== session.id_hash) endSignIn(s.id_hash);
+      return new Response(null, { status: 204 });
     }
     if (pathname === "/api/push/key" && method === "GET") return json({ key: (await vapidKeys()).publicKey });
     if (pathname === "/api/push/subscribe" && method === "POST") {

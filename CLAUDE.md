@@ -92,7 +92,11 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
     0600; rutas `GET /api/push/key`, `POST /api/push/subscribe|unsubscribe`). 404/410 del
     servicio push borra la suscripción.
   - `auth/` — `password.ts` (argon2id), `sessions.ts` (sesiones con hash), `ratelimit.ts`
-    (límite de login, módulo puro), `login.ts` (`POST /api/auth/login`).
+    (límite de login, módulo puro), `login.ts` (`POST /api/auth/login`), `devices.ts` (nombre
+    legible del User-Agent e id público = primeros 16 hex del hash). Dispositivos:
+    `GET /api/auth/sessions`, `POST /api/auth/sessions/revoke` (`{id}`) y `…/revoke-others`;
+    cerrar una sesión (`endSignIn`) borra la sesión, sus suscripciones push y cierra sus sockets
+    (1008). Web: `Devices.tsx` ("Signed-in devices" en la barra de Inicio).
 - `web/` — Vite + React 19 + Tailwind 4. Build a `dist/`. Sigue el canvas de Claude Design
   "Herdr Web — Sistema visual": colores como variables en `index.css` (utilidades `bg-canvas`,
   `text-ink`…; claro/oscuro por sistema o `data-theme`, ver `theme.ts`), fuentes servidas en local.

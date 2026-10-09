@@ -92,6 +92,18 @@ export function liveSubscriptions(sessionAlive: (session: string) => boolean): S
   return live;
 }
 
+/** a sign-in that ends takes its devices' subscriptions with it */
+export function removeSubscriptionsOf(session: string): void {
+  const before = subscriptions.length;
+  subscriptions = subscriptions.filter((s) => s.session !== session);
+  if (subscriptions.length !== before) save();
+}
+
+/** the sign-ins that have a device with notifications on */
+export function sessionsWithPush(): Set<string> {
+  return new Set(subscriptions.map((s) => s.session));
+}
+
 export function hasSubscription(endpoint: string): boolean {
   return subscriptions.some((s) => s.endpoint === endpoint);
 }

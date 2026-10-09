@@ -60,6 +60,22 @@ export type ServerFrame =
  */
 export type ClientFrame = { type: "refresh" } | { type: "presence"; visible: boolean; push: string | null };
 
+/** one sign-in in the devices list (`GET /api/auth/sessions`) */
+export interface SignIn {
+  /** the start of the token's hash: picks the sign-in to sign out */
+  id: string;
+  /** "Chrome on Linux", from its User-Agent */
+  device: string;
+  user_agent: string;
+  address: string | null;
+  created_at: number;
+  last_seen_at: number;
+  /** the browser asking */
+  current: boolean;
+  /** it gets push notifications */
+  notifications: boolean;
+}
+
 /** something worth telling the person: a session needs them, or one stopped working */
 export interface Notice {
   id: string;

@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { _reload, addSubscription, liveSubscriptions, parseSubscription, pushEndpointAllowed, removeSubscription, vapidKeys } from "./store.ts";
+import { _reload, addSubscription, liveSubscriptions, parseSubscription, pushEndpointAllowed, removeSubscription, removeSubscriptionsOf, sessionsWithPush, vapidKeys } from "./store.ts";
 
 // tests/preload.ts points the state and config dirs at temp folders
 const stateFile = join(process.env["HERDR_PLUGIN_STATE_DIR"]!, "push.json");
@@ -58,3 +58,10 @@ test("the VAPID keys are made once and kept private in the config dir", async ()
   expect(JSON.parse(readFileSync(path, "utf8")).publicKey).toBe(a.publicKey);
 });
 
+test("a sign-in that ends takes its subscriptions; the others stay", () => {
+  addSubscription(sub("https://fcm.googleapis.com/a"), "s1");
+  addSubscription(sub("https://web.push.apple.com/b"), "s2");
+  expect([...sessionsWithPush()].sort()).toEqual(["s1", "s2"]);
+  removeSubscriptionsOf("s1");
+  expect(liveSubscriptions(() => true).map((s) => s.session)).toEqual(["s2"]);
+});

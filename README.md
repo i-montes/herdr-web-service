@@ -143,6 +143,9 @@ wizard tries to enable `linger`; if it can't, it asks you to run
   its hash.
 - `Host` and `Origin` checks, strict CSP, HSTS over HTTPS.
 - The API and the WebSocket require a session.
+- **Signed-in devices** (Home's menu) lists every browser signed in with your password, with its
+  IP and last activity; sign out any of them, or all the others at once. A signed-out browser is
+  sent back to the password page right away.
 - Push notifications are encrypted end to end (the push service only relays ciphertext), go only
   to known push services, and belong to the sign-in that turned them on: signing out stops them.
 
