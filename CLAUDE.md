@@ -80,6 +80,17 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
     carpeta para no pedir permiso.
   - `herdr/panes.ts` — vista de terminal: `GET /api/panes/:id/screen`, `POST …/input` (texto y
     teclas de una lista blanca), `POST …/close`.
+  - `notify.ts` — qué cambios del roster merecen aviso (`NoticeWatch`, puro): un panel con agente
+    que pasa a `blocked` ("needs you") o deja de trabajar (`working` → `done`/`idle`, "finished").
+    El primer roster solo fija la base. `index.ts` (`announce`) manda cada aviso por `/ws`
+    (frame `notify`: toast y sonido en la web) y por Web Push a las suscripciones vivas, salvo a la
+    del navegador que tiene la web visible (frames `presence`). El cuerpo de un "needs you" es la
+    pregunta del menú que espera.
+  - `push/` — Web Push sin dependencias: `webpush.ts` (VAPID ES256 y cifrado aes128gcm del
+    RFC 8291 sobre WebCrypto; el test reproduce byte a byte el ejemplo del RFC) y `store.ts`
+    (claves VAPID en `<config dir>/vapid.json`, suscripciones en `<state dir>/push.json`, ambas
+    0600; rutas `GET /api/push/key`, `POST /api/push/subscribe|unsubscribe`). 404/410 del
+    servicio push borra la suscripción.
   - `auth/` — `password.ts` (argon2id), `sessions.ts` (sesiones con hash), `ratelimit.ts`
     (límite de login, módulo puro), `login.ts` (`POST /api/auth/login`).
 - `web/` — Vite + React 19 + Tailwind 4. Build a `dist/`. Sigue el canvas de Claude Design
@@ -88,7 +99,11 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   Pantallas: `Login.tsx`, `Home.tsx` (Inicio), `NewSession.tsx` (diálogo), `SessionView.tsx`
   (terminal; en escritorio la cabecera lleva modelo y esfuerzo, en móvil están en el menú ⋯).
   Rutas por hash: `#/` y `#/session/<pane>` (acepta también el antiguo `#/sesion/`).
-  PWA: `web/public/` (manifiesto, `sw.js` que nunca cachea `/api` ni `/ws`, iconos). El service
+  Avisos: `alerts.ts` (sonido silenciado por navegador, compartido entre Inicio y el ⋯ del chat;
+  estado y alta/baja de Web Push), `sound.ts` (WebAudio, sin archivos; arranca con el primer toque),
+  `Toasts.tsx` (nada para la sesión que tienes delante), `AlertSettings.tsx` (barra de Inicio).
+  PWA: `web/public/` (manifiesto, `sw.js` que nunca cachea `/api` ni `/ws` y muestra los push;
+  al tocar uno, la ventana abierta cambia de sesión por `postMessage`, iconos). El service
   worker solo se registra en HTTPS o localhost. `OpenOnPhone.tsx`: QR "Abrir en el móvil", solo
   en escritorio, con la URL de `PUBLIC_URL` (en modo local explica que el móvil no llega).
 - `shared/protocol.ts` — tipos compartidos servidor/cliente.
@@ -132,6 +147,10 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
   - H8 CSP, `nosniff`, `Referrer-Policy: no-referrer` en todo; HSTS en HTTPS.
   - H9 sesión: 30 días inactiva, 180 absoluta. Un WebSocket se cierra (1008) al cerrar sesión y,
     cada 60 s, si su sesión ya no vive.
+  - H10 push: solo endpoints `https` de servicios push conocidos (FCM, Mozilla, Apple, Windows; sin
+    puerto ni credenciales), para que el servidor no haga POST a direcciones arbitrarias. Cada
+    suscripción pertenece a la sesión que la creó y muere con ella. El contenido va cifrado de
+    extremo a extremo.
 - Probar el asistente: `python3 -I tests/pty.py setup <teclas...>` (envía cada tecla con pausa;
   imprime código de salida y la cola de la salida). Usa siempre `HERDR_PLUGIN_CONFIG_DIR` y
   `HERDR_PLUGIN_STATE_DIR` temporales (y un `HOME` temporal si llegara a instalar unidades) para

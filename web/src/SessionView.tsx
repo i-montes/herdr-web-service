@@ -8,6 +8,8 @@ import { agentLook, sessionName } from "./home.ts";
 import { MAX_FONT_PX, fitTerminal, isRule } from "./terminal.ts";
 import { Icon } from "./Home.tsx";
 import { PhoneDialog } from "./OpenOnPhone.tsx";
+import { BELL_ICON, PUSH_LABEL, SOUND_OFF_ICON, SOUND_ON_ICON, usePushToggle } from "./AlertSettings.tsx";
+import { setSoundMuted, useSoundMuted } from "./alerts.ts";
 import { createPortal } from "react-dom";
 
 /** the special-keys bar under the terminal; `|` and `~` are typed as text */
@@ -272,6 +274,28 @@ function OpencodeMenuItems({ paneId, busy, item, onDone }: { paneId: string; bus
   );
 }
 
+/** the sound (muted for every session and Home alike) and this device's notifications */
+function AlertItems({ item }: { item: string }) {
+  const muted = useSoundMuted();
+  const { state, busy, error, toggle } = usePushToggle();
+  const push = PUSH_LABEL[state];
+  return (
+    <>
+      <button type="button" role="menuitemcheckbox" aria-checked={!muted} onClick={() => setSoundMuted(!muted)} className={item}>
+        <Icon d={muted ? SOUND_OFF_ICON : SOUND_ON_ICON} size={16} className="text-muted" />
+        <span className="flex-1">{muted ? "Unmute sound" : "Mute sound"}</span>
+      </button>
+      {state !== "on" && (
+        <button type="button" role="menuitem" disabled={!push.enabled || busy} title={push.hint} onClick={() => void toggle()} className={`${item} disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
+          <Icon d={BELL_ICON} size={16} className="text-muted" />
+          <span className="flex-1">{busy ? "Working on it…" : push.label}</span>
+        </button>
+      )}
+      {error && <p className="px-3 pb-1 text-xs text-danger-ink">{error}</p>}
+    </>
+  );
+}
+
 /** "⋯": the actions that need not take header room (open on phone, close the session) */
 function SessionMenu({ access, onClose, agentItems }: { access: SessionInfo["access"]; onClose: () => void; agentItems?: (dismiss: () => void, item: string) => ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -328,6 +352,7 @@ function SessionMenu({ access, onClose, agentItems }: { access: SessionInfo["acc
             <Icon d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM11 18h2" size={16} className="text-muted" />
             Open on phone
           </button>
+          <AlertItems item={item} />
           {confirm ? (
             <div className="flex flex-col gap-2 p-2">
               <span className="text-sm">Close this session? The process will stop.</span>

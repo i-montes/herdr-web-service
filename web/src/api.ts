@@ -65,4 +65,7 @@ export const api = {
   opencodeOptions: (id: string) => call<OpencodeOptions>(pane(id, "models")),
   opencodeModel: (id: string, provider: string, model: string) => call<void>(pane(id, "model"), post({ provider, model })),
   opencodeVariant: (id: string, variant: string | null) => call<void>(pane(id, "variant"), post({ variant })),
+  pushKey: () => call<{ key: string }>("/api/push/key"),
+  pushSubscribe: (subscription: PushSubscriptionJSON) => call<void>("/api/push/subscribe", post(subscription)),
+  pushUnsubscribe: (endpoint: string) => call<void>("/api/push/unsubscribe", post({ endpoint })),
 };

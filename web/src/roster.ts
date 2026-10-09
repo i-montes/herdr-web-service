@@ -1,7 +1,11 @@
 /** Herdr's roster kept live over /ws, shared by every signed-in screen. */
 import { useEffect, useState } from "react";
-import type { Roster, ServerFrame } from "../../shared/protocol.ts";
+import type { ClientFrame, Roster, ServerFrame } from "../../shared/protocol.ts";
+import { attending, emitNotice, onAlertsChange, pushEndpoint } from "./alerts.ts";
 import { api } from "./api.ts";
+
+/** how often a tab being looked at confirms it (the server forgets it after PRESENCE_TTL_MS there) */
+const PRESENCE_MS = 20_000;
 
 /**
  * The live roster. The socket reconnects on its own (backoff up to 15 s, at once when the tab
@@ -20,6 +24,17 @@ export function useRoster(initiallyConnected: boolean): { roster: Roster; connec
     let delay = 1000;
     let stopped = false;
 
+    // whether the person is looking at this tab, and this browser's push subscription: a browser
+    // being looked at gets notices as toasts, so the server spares it the push. Repeated while
+    // looking: a phone can freeze the app before it says it went away, and the server stops
+    // trusting a "looking" it has not heard again within a minute
+    const presence = () => {
+      if (ws?.readyState !== WebSocket.OPEN) return;
+      const frame: ClientFrame = { type: "presence", visible: attending(), push: pushEndpoint() };
+      ws.send(JSON.stringify(frame));
+    };
+    const heartbeat = setInterval(() => attending() && presence(), PRESENCE_MS);
+
     const load = () =>
       api.roster().then((r) => {
         setRoster(r);
@@ -35,6 +50,7 @@ export function useRoster(initiallyConnected: boolean): { roster: Roster; connec
       socket.onopen = () => {
         delay = 1000;
         setLive(true);
+        presence();
         void load();
       };
       socket.onmessage = (event) => {
@@ -44,6 +60,7 @@ export function useRoster(initiallyConnected: boolean): { roster: Roster; connec
           setLoaded(true);
           setConnected(true);
         } else if (frame.type === "herdr") setConnected(frame.connected);
+        else if (frame.type === "notify") emitNotice(frame.notice);
       };
       socket.onclose = (event) => {
         if (ws !== socket || stopped) return;
@@ -60,6 +77,7 @@ export function useRoster(initiallyConnected: boolean): { roster: Roster; connec
     };
 
     const wake = () => {
+      presence();
       if (document.visibilityState === "visible") {
         delay = 1000;
         connect();
@@ -68,11 +86,18 @@ export function useRoster(initiallyConnected: boolean): { roster: Roster; connec
 
     void load();
     connect();
+    const offAlerts = onAlertsChange(presence);
+    window.addEventListener("focus", presence);
+    window.addEventListener("blur", presence);
     document.addEventListener("visibilitychange", wake);
     window.addEventListener("online", wake);
     return () => {
       stopped = true;
       clearTimeout(retry);
+      offAlerts();
+      clearInterval(heartbeat);
+      window.removeEventListener("focus", presence);
+      window.removeEventListener("blur", presence);
       document.removeEventListener("visibilitychange", wake);
       window.removeEventListener("online", wake);
       ws?.close();

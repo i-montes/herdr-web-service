@@ -5,6 +5,7 @@ import { AgentTile } from "./AgentTile.tsx";
 import { InstallBanner } from "./InstallBanner.tsx";
 import { NewSessionDialog } from "./NewSession.tsx";
 import { OpenOnPhone } from "./OpenOnPhone.tsx";
+import { AlertSettings } from "./AlertSettings.tsx";
 import { sessionHref } from "./roster.ts";
 import { FILTERS, STATUS_LABEL, BUCKET_OF, agentLook, homeView, plural, sessionName, type Filter, type WorkspaceGroup } from "./home.ts";
 import { useTheme } from "./theme.ts";
@@ -296,6 +297,7 @@ function SidebarBody({ groups, access, onLogout, onNew, mobile, onHome, themeTog
         </span>
         <span className="truncate font-mono text-xs text-muted">{access.host}</span>
         {themeToggle}
+        <AlertSettings />
         {extra}
         <LogoutButton onClick={onLogout} />
       </div>

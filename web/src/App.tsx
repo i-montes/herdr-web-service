@@ -5,6 +5,8 @@ import { Home } from "./Home.tsx";
 import { Login } from "./Login.tsx";
 import { useRoster, useRoute } from "./roster.ts";
 import { SessionView } from "./SessionView.tsx";
+import { Toasts } from "./Toasts.tsx";
+import { refreshPush } from "./alerts.ts";
 
 export function App() {
   const [session, setSession] = useState<SessionInfo | null>(null);
@@ -30,8 +32,17 @@ export function App() {
 function Signed({ session, onLogout }: { session: SessionInfo; onLogout: () => void }) {
   const { roster, connected, loaded, live } = useRoster(session.herdr?.connected !== false);
   const { paneId, go } = useRoute();
-  if (paneId) return <SessionView key={paneId} paneId={paneId} roster={roster} loaded={loaded} access={session.access} onBack={() => go(null)} />;
-  return <Home session={session} roster={roster} connected={connected} live={live} onLogout={onLogout} onCreated={go} />;
+  useEffect(() => void refreshPush().catch(() => {}), []);
+  return (
+    <>
+      {paneId ? (
+        <SessionView key={paneId} paneId={paneId} roster={roster} loaded={loaded} access={session.access} onBack={() => go(null)} />
+      ) : (
+        <Home session={session} roster={roster} connected={connected} live={live} onLogout={onLogout} onCreated={go} />
+      )}
+      <Toasts viewing={paneId} />
+    </>
+  );
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

@@ -27,6 +27,12 @@ computer, on your home network or on a VPS, and installs with a single command.
   with an optional first message and a permission mode. Claude Code and OpenCode can also start
   in **bypass** (no permission prompts: `--dangerously-skip-permissions` / `--auto`); it is never
   preselected, you choose it each time.
+- **Notifications** when a session needs you or finishes: push notifications on your phone or
+  desktop (turn them on per device; they need HTTPS, and on an iPhone the app installed on the
+  home screen), plus a toast and a sound while the app is open. Mute the sound from Home or a
+  session's `⋯` menu.
+- **What the agent left running**: a tab above the chat input lists its subagents, background
+  commands and monitors, so a long "Working…" explains itself.
 - **Images in the chat** (PNG, JPEG, GIF, WebP) for the agent to read.
 - **Terminal view** for shells, Codex and any session when you need it.
 - **Installable app (PWA)** on your phone, plus a **QR code** to open it from your desktop.
@@ -103,10 +109,12 @@ console, or switch tunnels. If a wizard run would change it, it asks first.
 ## On your phone
 
 1. When it finishes, the wizard shows the URL and a QR code. On the desktop, the web app also
-   has **Abrir en el móvil** (open on phone) with the same QR.
+   has **Open on phone** with the same QR.
 2. Scan the QR code (in Wi-Fi mode, with the phone on the same network).
 3. Sign in with your password.
 4. Optional, in tunnel mode: "Add to Home Screen" from the browser to use it as an app.
+5. Optional: **Turn on notifications** (Home's menu) to hear when a session needs you. On an
+   iPhone, do it from the app opened from the home screen.
 
 ## On a VPS
 
@@ -132,8 +140,10 @@ wizard tries to enable `linger`; if it can't, it asks you to run
   its hash.
 - `Host` and `Origin` checks, strict CSP, HSTS over HTTPS.
 - The API and the WebSocket require a session.
+- Push notifications are encrypted end to end (the push service only relays ciphertext), go only
+  to known push services, and belong to the sign-in that turned them on: signing out stops them.
 
-Details in `CLAUDE.md` (rules H1–H9).
+Details in `CLAUDE.md` (rules H1–H10).
 
 ## Claude Code status line
 
@@ -178,9 +188,10 @@ herdr plugin uninstall imontes.herdr-web-service
 ## Where things live
 
 - Configuration and password: `~/.config/herdr/plugins/config/imontes.herdr-web-service/`
-  (`.env`, `auth.json`, and `claude-statusline.json` if you had another status line).
+  (`.env`, `auth.json`, `vapid.json` with the push keys, and `claude-statusline.json` if you had
+  another status line).
 - State and log: `~/.local/state/herdr/plugins/imontes.herdr-web-service/`
-  (`sessions.json`, `server.log`, `claude-status/`).
+  (`sessions.json`, `push.json`, `server.log`, `claude-status/`).
 - If Herdr sets `HERDR_PLUGIN_CONFIG_DIR` and `HERDR_PLUGIN_STATE_DIR`, those paths are used.
 
 ## Development

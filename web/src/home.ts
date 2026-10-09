@@ -1,5 +1,6 @@
 /** What the Home screen shows, derived from Herdr's roster. Pure: no React, no DOM. */
 import type { AgentStatus, Roster, RosterPane, RosterWorkspace } from "../../shared/protocol.ts";
+import { AGENT_LABELS, sessionName } from "../../shared/names.ts";
 
 /** the four states the design draws; Herdr has no error state, so "With error" is not offered */
 export type Bucket = "waiting" | "working" | "idle";
@@ -30,9 +31,9 @@ export interface AgentLook {
 }
 
 const KNOWN: Record<string, AgentLook> = {
-  claude: { label: "Claude Code", initial: "C", tile: "bg-claude text-claude-ink" },
-  codex: { label: "Codex", initial: "X", tile: "bg-codex text-codex-ink" },
-  opencode: { label: "OpenCode", initial: "O", tile: "bg-opencode text-opencode-ink" },
+  claude: { label: AGENT_LABELS["claude"]!, initial: "C", tile: "bg-claude text-claude-ink" },
+  codex: { label: AGENT_LABELS["codex"]!, initial: "X", tile: "bg-codex text-codex-ink" },
+  opencode: { label: AGENT_LABELS["opencode"]!, initial: "O", tile: "bg-opencode text-opencode-ink" },
 };
 
 export function agentLook(agent: string | null): AgentLook {
@@ -40,13 +41,7 @@ export function agentLook(agent: string | null): AgentLook {
   return KNOWN[agent] ?? { label: agent[0]!.toUpperCase() + agent.slice(1), initial: agent[0]!.toUpperCase(), tile: "bg-inverse text-inverse-ink" };
 }
 
-/** the name a session goes by: the name it was given, the agent's terminal title, the agent, the folder */
-export function sessionName(pane: RosterPane): string {
-  if (pane.label) return pane.label;
-  if (pane.title) return pane.title;
-  if (pane.agent) return agentLook(pane.agent).label;
-  return pane.cwd.split("/").filter(Boolean).pop() || pane.cwd || "shell";
-}
+export { sessionName };
 
 export function ago(at: number | null, now: number): string | null {
   if (at === null) return null;

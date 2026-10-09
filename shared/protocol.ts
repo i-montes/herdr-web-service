@@ -51,10 +51,24 @@ export interface ApiError {
 /** Server → browser frames on /ws */
 export type ServerFrame =
   | { type: "roster"; roster: Roster }
-  | { type: "herdr"; connected: boolean };
+  | { type: "herdr"; connected: boolean }
+  | { type: "notify"; notice: Notice };
 
-/** Browser → server frames on /ws */
-export type ClientFrame = { type: "refresh" };
+/**
+ * Browser → server frames on /ws. `presence`: whether the tab is in view, and the push
+ * subscription of its browser, if any; a browser in view gets the notice as a toast, not a push.
+ */
+export type ClientFrame = { type: "refresh" } | { type: "presence"; visible: boolean; push: string | null };
+
+/** something worth telling the person: a session needs them, or one stopped working */
+export interface Notice {
+  id: string;
+  pane_id: string;
+  kind: "blocked" | "finished";
+  title: string;
+  body: string;
+  at: number;
+}
 
 // --- chat (Claude Code transcripts) ---------------------------------------------------------
 

@@ -9,7 +9,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { ChatResponse, PanePrompt, Roster, ServerFrame, SessionInfo } from "../shared/protocol.ts";
+import type { ChatResponse, ClientFrame, Notice, PanePrompt, Roster, ServerFrame, SessionInfo } from "../shared/protocol.ts";
 import { passwordConfigured, verifyPassword } from "./auth/password.ts";
 import { handleLogin } from "./auth/login.ts";
 import { clearedSessionCookie, createSession, revokeSession, sessionAlive, sessionCookie, sessionFromRequest } from "./auth/sessions.ts";
@@ -28,6 +28,9 @@ import { readClaudeStatus } from "./chat/usage.ts";
 import { opencodeCatalog, opencodeUsage, opencodeVariants, parseOpencodeFooter, recentOpencodeModels, setOpencodeModel, setOpencodeVariant } from "./chat/opencode-controls.ts";
 import { apiError, isRegularFile, json, withHeaders } from "./http.ts";
 import { socketsOfSession, staleSockets } from "./ws.ts";
+import { NoticeWatch } from "./notify.ts";
+import { addSubscription, liveSubscriptions, parseSubscription, removeSubscription, vapidKeys } from "./push/store.ts";
+import { sendPush } from "./push/webpush.ts";
 
 const herdr = new HerdrClient(config.herdrSocket);
 const access: AccessConfig = { mode: config.accessMode, publicUrl: config.publicUrl, host: config.host, port: config.port, devOrigin: config.devOrigin };
@@ -41,7 +44,13 @@ async function loadRoster(): Promise<Roster> {
 
 // --- live roster: one Herdr subscription fans out to every browser -------------------------
 
-type WsData = { sessionId: string };
+/**
+ * per socket: its sign-in, and from its `presence` frames whether the person is looking at it (and
+ * when it last said so) and its browser's push subscription
+ */
+type WsData = { sessionId: string; visible: boolean; seenAt: number; push: string | null };
+/** a "looking" not repeated within this long is stale: the phone froze the app before it could say */
+const PRESENCE_TTL_MS = 50_000;
 const clients = new Set<import("bun").ServerWebSocket<WsData>>();
 let unsubscribe: (() => void) | null = null;
 let rosterTimer: ReturnType<typeof setTimeout> | null = null;
@@ -64,6 +73,8 @@ function scheduleRoster(force = false): void {
     try {
       const roster = await loadRoster();
       watchStatuses(roster);
+      const notices = noticeWatch.next(roster, Date.now());
+      if (notices.length) void announce(notices);
       for (const prompt of readyPrompts(roster)) {
         deliverFirstPrompt(herdr, prompt.pane_id, prompt.text).catch((error) => console.error("first message:", error instanceof Error ? error.message : error));
       }
@@ -133,6 +144,43 @@ function watchStatuses(roster: Roster): void {
   }
 }
 
+// --- notices: a toast in every open browser, a push to the devices not looking ---------------
+
+const noticeWatch = new NoticeWatch();
+/** the push services want a contact: the site when it has a public HTTPS address */
+const PUSH_SUBJECT = config.publicUrl.startsWith("https://") ? config.publicUrl : "mailto:herdr-web-service@users.noreply.github.com";
+
+async function announce(notices: Notice[]): Promise<void> {
+  for (const notice of notices) {
+    // what it waits on says more than the agent's name: "Do you want to make this edit to server.ts?"
+    if (notice.kind === "blocked") {
+      const prompt = await currentPrompt(notice.pane_id).catch(() => null);
+      if (prompt?.title) notice.body = prompt.title;
+    }
+    broadcast({ type: "notify", notice });
+    const now = Date.now();
+    const looking = new Set([...clients].filter((ws) => ws.data.visible && ws.data.push && now - ws.data.seenAt < PRESENCE_TTL_MS).map((ws) => ws.data.push));
+    const subs = liveSubscriptions(sessionAlive);
+    const targets = subs.filter((sub) => !looking.has(sub.endpoint));
+    if (subs.length) console.log(`notice ${notice.kind} ${notice.pane_id}: push to ${targets.length} device(s)${looking.size ? `, ${subs.length - targets.length} skipped (looking at the app)` : ""}`);
+    if (!targets.length) continue;
+    const keys = await vapidKeys();
+    const payload = { title: notice.title, body: notice.body, tag: notice.pane_id, kind: notice.kind, url: `/#/session/${encodeURIComponent(notice.pane_id)}` };
+    await Promise.all(
+      targets.map(async (sub) => {
+        try {
+          const status = await sendPush(sub, payload, keys, PUSH_SUBJECT, { urgency: notice.kind === "blocked" ? "high" : "normal" });
+          // 404/410: the browser dropped this subscription (notifications turned off, app removed)
+          if (status === 404 || status === 410) removeSubscription(sub.endpoint);
+          else if (status >= 400) console.error(`push ${new URL(sub.endpoint).host}: ${status}`);
+        } catch (error) {
+          console.error(`push ${new URL(sub.endpoint).host}:`, error instanceof Error ? error.message : error);
+        }
+      }),
+    );
+  }
+}
+
 // --- HTTP ----------------------------------------------------------------------------------
 
 /** H7: Herdr's state is only disclosed to a signed-in browser. */
@@ -196,8 +244,20 @@ async function route(request: Request, facts: RequestFacts, server: import("bun"
       for (const ws of socketsOfSession(clients, session.id_hash)) ws.close(1008, "signed out");
       return new Response(null, { status: 204, headers: { "set-cookie": clearedSessionCookie() } });
     }
+    if (pathname === "/api/push/key" && method === "GET") return json({ key: (await vapidKeys()).publicKey });
+    if (pathname === "/api/push/subscribe" && method === "POST") {
+      const sub = parseSubscription(await readJson(request));
+      if (!sub) return apiError("invalid_subscription", "not a push subscription from a known push service", 400);
+      addSubscription(sub, session.id_hash);
+      return new Response(null, { status: 204 });
+    }
+    if (pathname === "/api/push/unsubscribe" && method === "POST") {
+      const body = (await readJson(request)) as { endpoint?: unknown } | undefined;
+      if (typeof body?.endpoint === "string") removeSubscription(body.endpoint);
+      return new Response(null, { status: 204 });
+    }
     if (pathname === "/ws") {
-      if (server.upgrade(request, { data: { sessionId: session.id_hash } })) return undefined;
+      if (server.upgrade(request, { data: { sessionId: session.id_hash, visible: false, seenAt: 0, push: null } })) return undefined;
       return apiError("upgrade_failed", "expected a WebSocket", 400);
     }
     try {
@@ -406,8 +466,18 @@ const server = Bun.serve<WsData>({
       scheduleRoster(true);
     },
     message(ws, message) {
-      if (String(message) === '{"type":"refresh"}') scheduleRoster(true);
-      else ws.close(1003, "unknown frame");
+      let frame: ClientFrame | null = null;
+      try {
+        frame = JSON.parse(String(message)) as ClientFrame;
+      } catch {
+        /* not JSON: refused below */
+      }
+      if (frame?.type === "refresh") scheduleRoster(true);
+      else if (frame?.type === "presence") {
+        ws.data.visible = frame.visible === true;
+        ws.data.seenAt = Date.now();
+        ws.data.push = typeof frame.push === "string" ? frame.push.slice(0, 2048) : null;
+      } else ws.close(1003, "unknown frame");
     },
     close(ws) {
       clients.delete(ws);
