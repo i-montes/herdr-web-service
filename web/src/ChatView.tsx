@@ -62,7 +62,14 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
   onGone: () => void;
 }) {
   const [chat, setChat] = useState<ChatSnapshot | null>(null);
-  const [prompt, setPrompt] = useState<PanePrompt | null>(null);
+  const [shownPrompt, setPrompt] = useState<PanePrompt | null>(null);
+  /** the menu cancelled from here (title|options): stays hidden until another one shows */
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const shownKey = shownPrompt ? `${shownPrompt.title}|${shownPrompt.options.join("|")}` : "";
+  const prompt = shownKey && shownKey === dismissed ? null : shownPrompt;
+  useEffect(() => {
+    if (dismissed && shownKey !== dismissed) setDismissed(null);
+  }, [shownKey, dismissed]);
   const [loaded, setLoaded] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -213,6 +220,8 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
 
   const cancel = async () => {
     setError(null);
+    // hidden here even if the terminal keeps showing it: a misread menu must never take the composer
+    setDismissed(promptKey);
     try {
       await api.input(paneId, { keys: ["esc"] });
       pollNow.current(true);
@@ -598,7 +607,8 @@ function ToolCard({ item }: { item: ToolItem }) {
   );
 }
 
-const FREE_OPTION = /^type something/i;
+/** the option that asks for your own words: Claude's "Type something", OpenCode's "Type your own answer" */
+const FREE_OPTION = /^type (something|your own answer)/i;
 
 interface MenuProps {
   prompt: PanePrompt;

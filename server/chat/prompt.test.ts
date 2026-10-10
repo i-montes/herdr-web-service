@@ -194,6 +194,41 @@ test("OpenCode: no dialog row, no prompt; the plain reader leaves it alone", () 
   expect(parsePrompt(plain)).toBeNull();
 });
 
+test("OpenCode: the hints as plain text, without the dialog's heading, are not a dialog", () => {
+  // a command shown on another agent's screen that mentions them
+  const shown = [border(esc("238;238;238", "20;20;20", "  Bash(python3 - <<'EOF' … `Allow once   Allow always   Reject`, `⇆ select`/`enter confirm`)")), border(esc("128;128;128", "20;20;20", "     … +68 lines"))].join("\n");
+  expect(parseOpencodePrompt(shown)).toBeNull();
+  expect(parseOpencodePrompt(opencodeScreen(0).split("\n").slice(4).join("\n"))).toBeNull();
+});
+
+const QPANEL = "20;20;20";
+const questionScreen = (chosen: number) =>
+  [
+    border(esc("238;238;238", QPANEL, "  ¿Qué hago con los iconos actuales y los nuevos?")),
+    border(""),
+    ...[
+      ["Tú me pasas los nuevos archivos ahora", "Espera a que coloques los PNG en public/ y los referencio desde el"],
+      ["Generar placeholders con SVG", "Creo SVGs neutros y los coloco como icon-192.png"],
+      ["Type your own answer", null],
+    ].flatMap(([label, description], i) => [
+      border(esc("238;238;238", i === chosen ? PANEL : QPANEL, `  ${i + 1}. ${label}`) + esc("255;255;255", QPANEL, " ".repeat(40) + "~/proyectos/recova-crm:main")),
+      ...(description ? [border(esc("128;128;128", QPANEL, `     ${description}`)), ...(i === 0 ? [border(esc("128;128;128", QPANEL, "     manifest."))] : [])] : []),
+    ]),
+    border(esc("128;128;128", QPANEL, "  ↑↓ select  enter submit  esc dismiss") + esc("255;255;255", QPANEL, " ".repeat(40) + "• OpenCode 1.18.35")),
+  ].join("\n");
+
+test("OpenCode's question: numbered options with their descriptions, the chosen row by its background", () => {
+  expect(parseOpencodePrompt(questionScreen(0))).toEqual({
+    title: "¿Qué hago con los iconos actuales y los nuevos?",
+    options: ["Tú me pasas los nuevos archivos ahora · Espera a que coloques los PNG en public/ y los referencio desde el manifest.", "Generar placeholders con SVG · Creo SVGs neutros y los coloco como icon-192.png", "Type your own answer"],
+    selected: 0,
+    axis: "vertical",
+  });
+  const second = parseOpencodePrompt(questionScreen(1))!;
+  expect(second.selected).toBe(1);
+  expect(keysToChoose(second, 2)).toEqual(["down", "enter"]);
+});
+
 test("ansi cells: text and backgrounds, 256 colors and resets included", () => {
   expect(ansiCells("a\x1b[48;5;21mbc\x1b[0md\x1b]0;title\x07e\r")).toEqual({ text: "abcde", bg: [null, "#21", "#21", null, null] });
   expect(ansiCells("\x1b[44mx\x1b[49my").bg).toEqual(["#44", null]);

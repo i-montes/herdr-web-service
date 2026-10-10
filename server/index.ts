@@ -338,7 +338,10 @@ async function currentPrompt(paneId: string): Promise<PanePrompt | null> {
   const screen = await herdr.request<{ read: { text: string } }>("pane.read", { pane_id: paneId, source: "visible", strip_ansi: true });
   const prompt = parsePrompt(screen.read.text);
   if (prompt || !/⇆ select|enter confirm/.test(screen.read.text)) return prompt;
-  // OpenCode marks its choice by color only: read the screen again with its colors
+  // OpenCode marks its choice by color only: read the screen again with its colors. Only in an
+  // OpenCode pane: another agent's screen can show those words (a command, a file) as plain text
+  const { pane } = await herdr.request<{ pane: PaneInfo }>("pane.get", { pane_id: paneId });
+  if (pane.agent !== "opencode") return null;
   const colored = await herdr.request<{ read: { text: string } }>("pane.read", { pane_id: paneId, source: "visible", format: "ansi" });
   return parseOpencodePrompt(colored.read.text);
 }
@@ -428,7 +431,12 @@ async function herdrRoute(request: Request, pathname: string, method: string): P
     if (!text || text.length > 20_000) return apiError("invalid_input", "text is required", 400);
     // Herdr's agent.prompt refuses slash commands: those are typed into the pane like at the keyboard
     if (text.startsWith("/")) await herdr.request("pane.send_input", { pane_id: promptTo, text, keys: ["enter"] });
-    else await herdr.request("agent.prompt", { target: promptTo, text });
+    else
+      await herdr.request("agent.prompt", { target: promptTo, text }).catch(async (error) => {
+        // a blocked agent (its question's "type your own answer" field is open) takes keys only
+        if (!(error instanceof HerdrError && error.code === "agent_blocked")) throw error;
+        await herdr.request("pane.send_input", { pane_id: promptTo, text, keys: ["enter"] });
+      });
     return new Response(null, { status: 204 });
   }
   const chooseIn = paneIdFrom(pathname, "choose");

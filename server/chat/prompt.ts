@@ -187,7 +187,8 @@ const OC_HINTS = /\s{2,}(?:ctrl\+f fullscreen\s+)?⇆ select.*$|\s{2,}enter conf
 
 /**
  * OpenCode's permission dialog ("△ Permission required" … `Allow once   Allow always   Reject`):
- * options in a row, moved with ←/→, the chosen one only shown by its background. Read from the
+ * options in a row, moved with ←/→, the chosen one only shown by its background. Both the row's
+ * key hints and the △ heading above it must be there. Read from the
  * screen with its colors (Herdr's `format: "ansi"`).
  */
 export function parseOpencodePrompt(ansiScreen: string): PanePrompt | null {
@@ -195,12 +196,14 @@ export function parseOpencodePrompt(ansiScreen: string): PanePrompt | null {
   const plain = rows.map((r) => clean(r.text));
   let row = -1;
   for (let i = plain.length - 1; i >= 0; i--) {
-    if (/⇆ select|enter confirm/.test(plain[i]!)) {
+    if (/⇆ select|enter confirm|↑↓ select\s+enter submit/.test(plain[i]!)) {
       row = i;
       break;
     }
   }
   if (row < 0) return null;
+  // the question dialog: numbered options down the screen, hints `↑↓ select  enter submit`
+  if (/↑↓ select|enter submit/.test(plain[row]!) && !/⇆ select/.test(plain[row]!)) return opencodeQuestion(rows, plain, row);
   const { text, bg } = rows[row]!;
   const hint = OC_HINTS.exec(text);
   const body = hint ? text.slice(0, hint.index) : text;
@@ -223,6 +226,48 @@ export function parseOpencodePrompt(ansiScreen: string): PanePrompt | null {
       break;
     }
   }
-  if (!title) title = plain.slice(Math.max(0, row - 15), row).map((l) => l.trim()).filter(Boolean).at(-1) ?? "OpenCode is asking";
+  // without its heading the row is not the dialog: those words were text on the screen
+  if (!title) return null;
   return { title, options: options.map((o) => o.label), selected: Math.max(0, selected), axis: "horizontal" };
+}
+
+/**
+ * OpenCode's question tool: the question, then `1. label` rows each with an indented description,
+ * the chosen row on its own background. Answered with ↑/↓ and Enter.
+ */
+function opencodeQuestion(rows: { text: string; bg: (string | null)[] }[], plain: string[], row: number): PanePrompt | null {
+  const options: string[] = [];
+  const colors: (string | null)[] = [];
+  let first = -1;
+  let column = 0;
+  for (let i = Math.max(0, row - 60); i < row; i++) {
+    // OpenCode's sidebar shares the rows, far to the right: cut it off
+    const line = plain[i]!.replace(/(\S)\s{6,}\S.*$/, "$1");
+    const m = /^(\s*)(\d+)\.\s+(\S.*)$/.exec(line);
+    if (m && Number(m[2]) === options.length + 1) {
+      if (first < 0) first = i;
+      options.push(m[3]!.trim());
+      column = line.indexOf(m[3]!);
+      const at = rows[i]!.text.indexOf(`${m[2]}.`);
+      colors.push(rows[i]!.bg[at] ?? null);
+    } else if (m && Number(m[2]) === 1) {
+      // an earlier numbered list (the agent's text): start over
+      options.length = 0;
+      colors.length = 0;
+      first = i;
+      options.push(m[3]!.trim());
+      column = line.indexOf(m[3]!);
+      const at = rows[i]!.text.indexOf("1.");
+      colors.push(rows[i]!.bg[at] ?? null);
+    } else if (options.length && line.trim() && indent(line) >= column && indent(line) <= column + 4) {
+      // the description under an option (wrapped onto several rows)
+      const last = options.length - 1;
+      options[last] += (options[last]!.includes(" · ") ? " " : " · ") + line.trim();
+    }
+  }
+  if (options.length < 2 || first < 1) return null;
+  const selected = colors.findIndex((c) => colors.filter((d) => d === c).length === 1);
+  const title = plain.slice(Math.max(0, first - 8), first).map((l) => l.trim()).filter(Boolean).at(-1) ?? "";
+  if (!title) return null;
+  return { title, options, selected: Math.max(0, selected), axis: "vertical" };
 }
