@@ -182,6 +182,14 @@ export function ansiCells(line: string): { text: string; bg: (string | null)[] }
   return { text, bg };
 }
 
+/** the key hints under OpenCode's dialogs: permission (`⇆ select  enter confirm`) or question (`↑↓ select  enter submit`) */
+const OC_DIALOG = /⇆ select|enter confirm|↑↓ select\s+enter submit/;
+
+/** a screen that may show one of OpenCode's dialogs: worth reading again with its colors */
+export function mayShowOpencodeDialog(plainScreen: string): boolean {
+  return OC_DIALOG.test(plainScreen);
+}
+
 /** the key hints at the end of OpenCode's dialog row: `ctrl+f fullscreen  ⇆ select  enter confirm` */
 const OC_HINTS = /\s{2,}(?:ctrl\+f fullscreen\s+)?⇆ select.*$|\s{2,}enter confirm.*$/;
 
@@ -196,7 +204,7 @@ export function parseOpencodePrompt(ansiScreen: string): PanePrompt | null {
   const plain = rows.map((r) => clean(r.text));
   let row = -1;
   for (let i = plain.length - 1; i >= 0; i--) {
-    if (/⇆ select|enter confirm|↑↓ select\s+enter submit/.test(plain[i]!)) {
+    if (OC_DIALOG.test(plain[i]!)) {
       row = i;
       break;
     }

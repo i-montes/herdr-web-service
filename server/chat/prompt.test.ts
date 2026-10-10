@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ansiCells, parseOpencodePrompt, keysToChoose, parsePrompt } from "./prompt.ts";
+import { ansiCells, mayShowOpencodeDialog, parseOpencodePrompt, keysToChoose, parsePrompt } from "./prompt.ts";
 
 const trust = `
 ❯ claude
@@ -224,6 +224,12 @@ test("OpenCode's question: numbered options with their descriptions, the chosen 
     selected: 0,
     axis: "vertical",
   });
+  // the plain read is what decides to read the colors: both dialogs must pass it
+  const plainOf = (screen: string) => screen.replace(/\x1b\[[0-9;]*m|\r/g, "");
+  expect(parsePrompt(plainOf(questionScreen(0)))).toBeNull();
+  expect(mayShowOpencodeDialog(plainOf(questionScreen(0)))).toBe(true);
+  expect(mayShowOpencodeDialog(plainOf(opencodeScreen(0)))).toBe(true);
+  expect(mayShowOpencodeDialog("  ▣  Build · MiniMax-M3")).toBe(false);
   const second = parseOpencodePrompt(questionScreen(1))!;
   expect(second.selected).toBe(1);
   expect(keysToChoose(second, 2)).toEqual(["down", "enter"]);
