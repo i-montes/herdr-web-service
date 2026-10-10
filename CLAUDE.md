@@ -63,7 +63,10 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
     acaba con su `<task-notification>` con `<status>` o un `TaskStop`; la web lo muestra en la
     pestaña "N running" sobre el input (`RunningTasks.tsx`). `prompt.ts` lee de la
     pantalla el menú que espera el agente (permisos, preguntas, /model, el deslizador de /effort)
-    y lo responde con flechas + Enter. Los comandos de barra se escriben con `pane.send_input`
+    y lo responde con flechas + Enter. El diálogo de permisos de OpenCode (`△ Permission required`,
+    `Allow once   Allow always   Reject`) solo marca la opción elegida con el color de fondo: si el
+    texto plano no da menú y hay `⇆ select`/`enter confirm`, se relee con `format: "ansi"`
+    (`parseOpencodePrompt`) y se responde con ←/→ + Enter. Los comandos de barra se escriben con `pane.send_input`
     (`agent.prompt` los rechaza). `opencode.ts` lee las sesiones de OpenCode de su SQLite
     (`~/.local/share/opencode/opencode.db`, solo lectura); su integración de Herdr reporta el
     `ses_…` de cada panel.

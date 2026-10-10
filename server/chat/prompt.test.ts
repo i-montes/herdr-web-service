@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { keysToChoose, parsePrompt } from "./prompt.ts";
+import { ansiCells, parseOpencodePrompt, keysToChoose, parsePrompt } from "./prompt.ts";
 
 const trust = `
 ❯ claude
@@ -152,4 +152,49 @@ test("echoed commands and results at the left edge are not a menu", () => {
 ───────────────────────────────
   ⏸ manual mode on · ? for shortcuts
 `)).toBeNull();
+});
+
+// OpenCode's permission dialog as Herdr reads it with `format: "ansi"` (24-bit colors, the chosen
+// option on the accent background, the others on the panel's)
+const esc = (fg: string, bg: string, text: string) => `\x1b[0m\x1b[38;2;${fg}m\x1b[48;2;${bg}m${text}`;
+const PANEL = "30;30;30";
+const ACCENT = "245;167;66";
+const border = (rest: string) => esc("255;255;255", "10;10;10", "  ") + esc(ACCENT, "20;20;20", "┃") + rest + "\x1b[0m\r";
+const dialogRow = (chosen: number) => {
+  const labels = ["Allow once", "Allow always", "Reject"];
+  const parts = labels.map((label, i) => (i === chosen ? esc("255;255;255", ACCENT, " ") + esc("10;10;10", ACCENT, label) + esc("255;255;255", ACCENT, " ") : esc("128;128;128", PANEL, label)));
+  return border(esc("255;255;255", PANEL, "  ") + parts.join(esc("255;255;255", PANEL, "   ")) + esc("255;255;255", PANEL, "        ") + esc("238;238;238", PANEL, "ctrl+f fullscreen  ⇆ select  enter confirm"));
+};
+const opencodeScreen = (chosen: number) =>
+  [
+    border(esc("238;238;238", "20;20;20", "  $ grep -rn brand app/layout.tsx")),
+    border(""),
+    border(esc(ACCENT, "20;20;20", "  △ ") + esc("238;238;238", "20;20;20", "Permission required")),
+    border(esc("128;128;128", "20;20;20", "    ← ") + esc("238;238;238", "20;20;20", "Access external directory ~/proyectos/recova-crm-pwa/app")),
+    border(""),
+    border(esc("128;128;128", "20;20;20", "  Patterns")),
+    border(esc("238;238;238", "20;20;20", "  - /home/ubuntu/proyectos/recova-crm-pwa/app/*")),
+    border(esc("255;255;255", PANEL, "    ")),
+    dialogRow(chosen),
+    border(esc("255;255;255", PANEL, "    ")),
+  ].join("\n");
+
+test("OpenCode's permission dialog: the choice is the option with its own background", () => {
+  const prompt = parseOpencodePrompt(opencodeScreen(0));
+  expect(prompt).toEqual({ title: "Permission required: Access external directory ~/proyectos/recova-crm-pwa/app", options: ["Allow once", "Allow always", "Reject"], selected: 0, axis: "horizontal" });
+  expect(parseOpencodePrompt(opencodeScreen(1))!.selected).toBe(1);
+  // answered with ←/→ and Enter, like the dialog's own keys
+  expect(keysToChoose(prompt!, 2)).toEqual(["right", "right", "enter"]);
+  expect(keysToChoose(parseOpencodePrompt(opencodeScreen(2))!, 0)).toEqual(["left", "left", "enter"]);
+});
+
+test("OpenCode: no dialog row, no prompt; the plain reader leaves it alone", () => {
+  expect(parseOpencodePrompt(border(esc("238;238;238", "20;20;20", "  ▣  Build · MiniMax-M3")))).toBeNull();
+  const plain = opencodeScreen(0).replace(/\x1b\[[0-9;]*m|\r/g, "");
+  expect(parsePrompt(plain)).toBeNull();
+});
+
+test("ansi cells: text and backgrounds, 256 colors and resets included", () => {
+  expect(ansiCells("a\x1b[48;5;21mbc\x1b[0md\x1b]0;title\x07e\r")).toEqual({ text: "abcde", bg: [null, "#21", "#21", null, null] });
+  expect(ansiCells("\x1b[44mx\x1b[49my").bg).toEqual(["#44", null]);
 });

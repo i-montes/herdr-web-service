@@ -143,3 +143,86 @@ export function keysToChoose(prompt: PanePrompt, index: number): ("up" | "down" 
   const [back, forward] = prompt.axis === "horizontal" ? (["left", "right"] as const) : (["up", "down"] as const);
   return [...Array<"up" | "down" | "left" | "right">(Math.abs(steps)).fill(steps > 0 ? forward : back), "enter"];
 }
+
+// --- OpenCode's dialogs: the choice is marked by color only -------------------------------------
+
+/** a terminal line as text plus each character's background color (null: the default) */
+export function ansiCells(line: string): { text: string; bg: (string | null)[] } {
+  let text = "";
+  const bg: (string | null)[] = [];
+  let current: string | null = null;
+  const sgr = (params: number[]) => {
+    for (let i = 0; i < params.length; i++) {
+      const p = params[i]!;
+      if (p === 0 || p === 49) current = null;
+      else if (p === 48 && params[i + 1] === 2) {
+        current = params.slice(i + 2, i + 5).join(",");
+        i += 4;
+      } else if (p === 48 && params[i + 1] === 5) {
+        current = `#${params[i + 2]}`;
+        i += 2;
+      } else if (p === 38 && params[i + 1] === 2) i += 4;
+      else if (p === 38 && params[i + 1] === 5) i += 2;
+      else if ((p >= 40 && p <= 47) || (p >= 100 && p <= 107)) current = `#${p}`;
+    }
+  };
+  // CSI sequences (colors handled, the rest skipped), OSC sequences skipped
+  const re = /\x1b\[([0-9;?]*)([A-Za-z])|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\r/g;
+  let at = 0;
+  for (let m = re.exec(line); ; m = re.exec(line)) {
+    const end = m ? m.index : line.length;
+    for (const ch of line.slice(at, end)) {
+      text += ch;
+      bg.push(current);
+    }
+    if (!m) break;
+    if (m[2] === "m") sgr((m[1] || "0").split(";").map(Number));
+    at = re.lastIndex;
+  }
+  return { text, bg };
+}
+
+/** the key hints at the end of OpenCode's dialog row: `ctrl+f fullscreen  ⇆ select  enter confirm` */
+const OC_HINTS = /\s{2,}(?:ctrl\+f fullscreen\s+)?⇆ select.*$|\s{2,}enter confirm.*$/;
+
+/**
+ * OpenCode's permission dialog ("△ Permission required" … `Allow once   Allow always   Reject`):
+ * options in a row, moved with ←/→, the chosen one only shown by its background. Read from the
+ * screen with its colors (Herdr's `format: "ansi"`).
+ */
+export function parseOpencodePrompt(ansiScreen: string): PanePrompt | null {
+  const rows = ansiScreen.split("\n").map(ansiCells);
+  const plain = rows.map((r) => clean(r.text));
+  let row = -1;
+  for (let i = plain.length - 1; i >= 0; i--) {
+    if (/⇆ select|enter confirm/.test(plain[i]!)) {
+      row = i;
+      break;
+    }
+  }
+  if (row < 0) return null;
+  const { text, bg } = rows[row]!;
+  const hint = OC_HINTS.exec(text);
+  const body = hint ? text.slice(0, hint.index) : text;
+  // each label with where it starts, the borders left out
+  const options: { label: string; at: number }[] = [];
+  for (const m of body.matchAll(/[^\s┃│](?:\S| (?! ))*/g)) options.push({ label: m[0], at: m.index });
+  if (options.length < 2) return null;
+  // the chosen one has a background none of the others share
+  const colors = options.map((o) => bg[o.at] ?? null);
+  const selected = colors.findIndex((c) => colors.filter((d) => d === c).length === 1);
+
+  // the title: the heading (△ …) and what it asks for (the ← line) above the row
+  let title = "";
+  for (let i = row - 1; i >= 0 && i >= row - 25; i--) {
+    const line = plain[i]!.trim();
+    if (/^[△⚠]/.test(line)) {
+      const heading = line.replace(/^[△⚠]\s*/, "");
+      const detail = plain.slice(i + 1, row).map((l) => l.trim()).find((l) => l && !/^Patterns$/.test(l));
+      title = detail ? `${heading}: ${detail.replace(/^[←→]\s*/, "")}` : heading;
+      break;
+    }
+  }
+  if (!title) title = plain.slice(Math.max(0, row - 15), row).map((l) => l.trim()).filter(Boolean).at(-1) ?? "OpenCode is asking";
+  return { title, options: options.map((o) => o.label), selected: Math.max(0, selected), axis: "horizontal" };
+}

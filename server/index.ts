@@ -25,7 +25,7 @@ import { paneIdFrom, parsePaneInput } from "./herdr/panes.ts";
 import { listDirs } from "./fsbrowse.ts";
 import { MAX_UPLOAD, cleanupUploads, saveUpload, uploadPath } from "./uploads.ts";
 import { locateTranscript, readChat } from "./chat/store.ts";
-import { keysToChoose, parsePrompt } from "./chat/prompt.ts";
+import { keysToChoose, parseOpencodePrompt, parsePrompt } from "./chat/prompt.ts";
 import { locateOpencodeSession, opencodeDb, readOpencodeChat } from "./chat/opencode.ts";
 import { readClaudeStatus } from "./chat/usage.ts";
 import { opencodeCatalog, opencodeUsage, opencodeVariants, parseOpencodeFooter, recentOpencodeModels, setOpencodeModel, setOpencodeVariant } from "./chat/opencode-controls.ts";
@@ -336,7 +336,11 @@ async function opencodeOptions(paneId: string): Promise<{ models: ReturnType<typ
 
 async function currentPrompt(paneId: string): Promise<PanePrompt | null> {
   const screen = await herdr.request<{ read: { text: string } }>("pane.read", { pane_id: paneId, source: "visible", strip_ansi: true });
-  return parsePrompt(screen.read.text);
+  const prompt = parsePrompt(screen.read.text);
+  if (prompt || !/⇆ select|enter confirm/.test(screen.read.text)) return prompt;
+  // OpenCode marks its choice by color only: read the screen again with its colors
+  const colored = await herdr.request<{ read: { text: string } }>("pane.read", { pane_id: paneId, source: "visible", format: "ansi" });
+  return parseOpencodePrompt(colored.read.text);
 }
 
 type PaneInfo = { cwd?: string; agent?: string | null; agent_status?: string; agent_session?: { kind: string; value: string } | null };
