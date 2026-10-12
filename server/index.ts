@@ -370,9 +370,13 @@ async function chatOfPane(paneId: string, version: string | null): Promise<ChatR
   const snapshot = await readChat(found.path, homedir());
   // the status line rewrites its file on its own schedule: its time joins the version
   const usage = readClaudeStatus(STATE_DIR, basename(found.path, ".jsonl"));
-  const full = `${snapshot.version}:${usage?.updatedAt ?? 0}`;
+  // nothing waits in Claude Code's queue while it rests: it takes the next message at once. Shown
+  // anyway, a queue the transcript failed to empty would stay pinned to the chat for good
+  const resting = pane.agent_status === "idle" || pane.agent_status === "done";
+  const queued = resting ? [] : snapshot.queued;
+  const full = `${snapshot.version}:${usage?.updatedAt ?? 0}:${queued.length}`;
   if (version && version === full) return { chat: null, unchanged: true, prompt };
-  return { chat: { ...snapshot, version: full, usage, source: found.source }, prompt };
+  return { chat: { ...snapshot, queued, version: full, usage, source: found.source }, prompt };
 }
 
 async function readJson(request: Request): Promise<unknown> {

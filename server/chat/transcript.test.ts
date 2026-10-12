@@ -117,6 +117,26 @@ test("queued messages wait, dequeued ones leave, absorbed ones become user messa
   expect(snap.items.map((i) => (i.kind === "user" ? i.text : i.kind))).toEqual(["uno", "tres"]);
 });
 
+test("a dequeue takes the oldest, whatever shape it comes back in", () => {
+  const op = (operation: string, extra: object = {}) => line({ type: "queue-operation", operation, uuid: "q" + Math.random(), timestamp: "2026-10-08T10:00:02Z", ...extra });
+  const reset = "Your claude.ai usage limit has reset. Continue the task you were working on when the limit was reached; do not repeat work that is already complete.";
+  const t = feed([
+    op("enqueue", { content: notice("a1", "<status>completed</status>") }),
+    op("dequeue"),
+    // comes back as a meta line, which the chat does not show
+    op("enqueue", { content: reset }),
+    op("dequeue"),
+    user(reset, { isMeta: true }),
+    // comes back as a command line, not as "/login"
+    op("enqueue", { content: "/login" }),
+    op("enqueue", { content: "y luego esto" }),
+  ]);
+  expect(t.snapshot(10).queued).toEqual(["/login", "y luego esto"]);
+  t.feed(op("dequeue"));
+  t.feed(user("<command-name>/login</command-name>\n<command-message>login</command-message>\n<command-args></command-args>"));
+  expect(t.snapshot(10).queued).toEqual(["y luego esto"]);
+});
+
 test("an edit's real patch replaces the diff guessed from its input", () => {
   const t = feed([
     assistant([{ type: "tool_use", id: "w", name: "Write", input: { file_path: "/Users/ana/p/a.ts", content: "a\nB\nc\nd" } }]),

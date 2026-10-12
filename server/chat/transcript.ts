@@ -124,6 +124,7 @@ export class Transcript {
   private items: ChatItem[] = [];
   private tools = new Map<string, number>();
   private model: string | null = null;
+  /** Claude Code's message queue as it holds it, task notices included (they take their turn too) */
   private queued: string[] = [];
   /** what is still running, by task id (a tool_use id until a background launch reports its own) */
   private running = new Map<string, RunningTask>();
@@ -212,18 +213,21 @@ export class Transcript {
   }
 
   /**
-   * Claude Code's message queue. A dequeued message comes back as a user line, so it just leaves
-   * the queue; one absorbed into the running turn never does, so it becomes a user item here.
+   * Claude Code's message queue. A dequeue names nothing: it takes the oldest (the queue is FIFO),
+   * which then comes back as a user line, maybe changed (`/login` as `<command-name>`, the
+   * "usage limit has reset" notice as a meta line), so the dequeue is what ends its wait. One
+   * absorbed into the running turn never comes back, so it becomes a user item here.
    */
   private queue(id: string, operation: string, content: string, reason: string, at: string | null): void {
     if (operation === "enqueue") {
       // a task notice is queued the moment it arrives, often well before it reaches the conversation
       this.notified(content);
-      // only what the person typed waits in the visible queue, not task notices
-      if (userText(content)) this.queued.push(content);
+      this.queued.push(content);
       return;
     }
     if (operation === "dequeue") {
+      const index = content ? this.queued.indexOf(content) : 0;
+      if (index >= 0) this.queued.splice(index, 1);
       return;
     }
     if (operation === "remove") {
@@ -413,6 +417,6 @@ export class Transcript {
     this.items.forEach((item, i) => item.kind === "plan" && (lastPlan = i));
     const visible = this.items.filter((item, i) => item.kind !== "plan" || i === lastPlan);
     const start = Math.max(0, visible.length - limit);
-    return { version, items: visible.slice(start), hidden: start, model: this.model, queued: [...this.queued], tasks: [...this.running.values()] };
+    return { version, items: visible.slice(start), hidden: start, model: this.model, queued: this.queued.filter((c) => userText(c)), tasks: [...this.running.values()] };
   }
 }
