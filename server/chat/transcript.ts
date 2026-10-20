@@ -54,6 +54,24 @@ function taskNotification(text: string): { id: string; done: boolean; event: str
   return { id, done: /<status>/.test(text), event: /<event>([\s\S]*?)<\/event>/.exec(text)?.[1]?.trim() ?? null };
 }
 
+/**
+ * A message from another agent of this session (a subagent's report, a teammate's SendMessage):
+ * who sent it and what it says. Claude Code wraps it as "Another Claude session sent a message:
+ * <agent-message from=…>…</agent-message>" plus a warning for the model.
+ */
+function agentMessage(text: string): { from: string; text: string; handback: boolean } | null {
+  const found = /^\s*(?:Another Claude session sent a message:\s*)?<agent-message from="([^"]*)">\n?([\s\S]*?)(?:<\/agent-message>|$)/.exec(text);
+  if (!found) return null;
+  let lines = found[2]!.replace(/\s+$/, "").split("\n");
+  // a hand-back opens with a frame line for the model, then the report indented by the harness
+  const handback = /^\[Subagent hand-back\]/.test(lines[0] ?? "");
+  if (handback) {
+    lines = lines.slice(1);
+    if (lines.every((line) => line === "" || line.startsWith("  "))) lines = lines.map((line) => line.slice(2));
+  }
+  return { from: found[1]!, text: lines.join("\n").trim(), handback };
+}
+
 const truthy = (value: unknown) => value === true || value === "true";
 
 /**
@@ -68,7 +86,7 @@ export function commandGist(command: string): string {
 
 /** what a user string shows: reminders stripped, pasted blocks unwrapped; null for Claude Code's own bookkeeping */
 function userText(text: string): string | null {
-  if (/^\s*<(command-name|command-message|local-command-stdout|local-command-stderr|local-command-caveat|bash-input|bash-stdout|bash-stderr|task-notification)>/.test(text)) return null;
+  if (/^\s*<(command-name|command-message|local-command-stdout|local-command-stderr|local-command-caveat|bash-input|bash-stdout|bash-stderr|task-notification)>/.test(text) || agentMessage(text)) return null;
   const cleaned = text
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
     .replace(/<pasted_content[^>]*>\n?([\s\S]*?)\n?<\/pasted_content[^>]*>/g, "$1")
@@ -160,16 +178,26 @@ export class Transcript {
       return;
     }
     if (type !== "user" && type !== "assistant") return;
-    if (o["isMeta"] === true || o["isCompactSummary"] === true) return;
     const message = (o["message"] ?? {}) as Raw;
     const content = message["content"];
+    // another agent wrote this, not the person (a meta line, but its report is worth showing)
+    const agent = type === "user" && typeof content === "string" ? agentMessage(content) : null;
+    if (agent) {
+      const from = str(((o["origin"] ?? {}) as Raw)["name"]) || agent.from;
+      this.items.push({ kind: "agent", id, from, text: agent.text, handback: agent.handback, at });
+      this.unqueue(content as string);
+      return;
+    }
+    if (o["isMeta"] === true || o["isCompactSummary"] === true) return;
 
     if (type === "user") {
+      const origin = (o["origin"] ?? {}) as Raw;
       // Claude Code records a background task's completion as a user line: it is a notice
       if (typeof content === "string") this.notified(content);
       const notice = typeof content === "string" ? taskNotice(content) : null;
-      if (notice || (o["origin"] as Raw | undefined)?.["kind"] === "task-notification") {
+      if (notice || origin["kind"] === "task-notification") {
         this.items.push({ kind: "divider", id, text: `Background task: ${notice ?? "finished"}` });
+        if (typeof content === "string") this.unqueue(content);
         return;
       }
       if (typeof content === "string") {
@@ -222,12 +250,15 @@ export class Transcript {
     if (operation === "enqueue") {
       // a task notice is queued the moment it arrives, often well before it reaches the conversation
       this.notified(content);
+      // the same notice queued again is not a second one: a single remove takes it
+      if (taskNotification(content) && this.queued.includes(content)) return;
       this.queued.push(content);
       return;
     }
     if (operation === "dequeue") {
-      const index = content ? this.queued.indexOf(content) : 0;
-      if (index >= 0) this.queued.splice(index, 1);
+      // task notices wait behind everything else (a later priority), so they leave last
+      const index = content ? this.queued.indexOf(content) : this.queued.findIndex((c) => !taskNotification(c));
+      this.queued.splice(index >= 0 ? index : 0, 1);
       return;
     }
     if (operation === "remove") {
@@ -235,15 +266,17 @@ export class Transcript {
       if (index >= 0) this.queued.splice(index, 1);
       if (reason !== "absorbed_mid_turn") return;
       const notice = taskNotice(content);
+      const message = agentMessage(content);
       const text = userText(content);
       if (notice) this.items.push({ kind: "divider", id, text: `Background task: ${notice}` });
+      else if (message) this.items.push({ kind: "agent", id, from: message.from, text: message.text, handback: message.handback, at });
       else if (text) this.items.push({ kind: "user", id, text, at });
     }
   }
 
-  /** a queued message reached the conversation: it no longer waits */
+  /** a queued message reached the conversation, maybe wrapped (an agent's message): it no longer waits */
   private unqueue(content: string): void {
-    const index = this.queued.indexOf(content);
+    const index = this.queued.findIndex((c) => c === content || (c !== "" && content.includes(c)));
     if (index >= 0) this.queued.splice(index, 1);
   }
 

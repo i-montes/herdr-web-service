@@ -51,6 +51,7 @@ const FAST_POLL_MS = 600;
 
 type ToolItem = Extract<ChatItem, { kind: "tool" }>;
 type QuestionItem = Extract<ChatItem, { kind: "question" }>;
+type AgentMessageItem = Extract<ChatItem, { kind: "agent" }>;
 
 /** Claude Code's conversation for a pane, live, with a composer and the menus it waits on. */
 export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
@@ -498,6 +499,8 @@ function ChatEntry({ item }: { item: ChatItem }) {
           </Markdown>
         </div>
       );
+    case "agent":
+      return <AgentMessageCard item={item} />;
     case "tool":
       return <ToolCard item={item} />;
     case "plan": {
@@ -540,6 +543,34 @@ function ChatEntry({ item }: { item: ChatItem }) {
         </div>
       );
   }
+}
+
+/** another agent's message (a subagent's report): on the agent's side, folded, the text on demand */
+function AgentMessageCard({ item }: { item: AgentMessageItem }) {
+  const [open, setOpen] = useState(false);
+  const bodyId = `agent-${item.id}`;
+  return (
+    <div className="flex flex-col overflow-hidden rounded-[14px] border border-line bg-surface">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={bodyId}
+        className="flex min-h-11 cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-inset"
+      >
+        <Icon d="M9 6l6 6-6 6" size={14} width={2.4} className={`shrink-0 text-muted transition-transform duration-150 ${open ? "rotate-90" : ""}`} />
+        <span className="shrink-0 rounded-md bg-tool px-2 py-[3px] font-mono text-[11px] font-semibold text-tool-ink">{item.handback ? "Report" : "Message"}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px]">from {item.from}</span>
+      </button>
+      {open && (
+        <div id={bodyId} className="hw-md max-h-[60vh] overflow-auto border-t border-line px-3.5 py-3 text-sm leading-[1.6] text-ink-soft [overflow-wrap:anywhere]">
+          <Markdown remarkPlugins={[remarkGfm]} components={{ a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>
+            {item.text}
+          </Markdown>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** a tool call as an accordion: the header always, the command, output or diff on demand */

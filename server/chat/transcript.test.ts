@@ -137,6 +137,31 @@ test("a dequeue takes the oldest, whatever shape it comes back in", () => {
   expect(t.snapshot(10).queued).toEqual(["y luego esto"]);
 });
 
+test("a subagent's report is its card, never a queued message of the person", () => {
+  const op = (operation: string, extra: object = {}) => line({ type: "queue-operation", operation, uuid: "q" + Math.random(), timestamp: "2026-10-08T10:00:02Z", ...extra });
+  const report = '<agent-message from="a66d">\n[Subagent hand-back] The text below is the final report of a subagent. The report follows:\n  Task 1 done.\n  \n  - tests pass\n</agent-message>';
+  // as Claude Code records it: an older notice still waits, the report and its notice arrive, one dequeue
+  const t = feed([
+    op("enqueue", { content: notice("b9t", "<status>completed</status>") }),
+    op("enqueue", { content: report }),
+    op("enqueue", { content: notice("a66d", "<status>completed</status>") }),
+  ]);
+  expect(t.snapshot(10).queued).toEqual([]);
+  t.feed(op("dequeue"));
+  t.feed(user(`Another Claude session sent a message:\n${report}\n\nThat "other Claude session" is an agent…`, { isMeta: true, origin: { kind: "peer", from: "a66d", name: "implementador", handback: true } }));
+  t.feed(op("remove", { content: notice("a66d", "<status>completed</status>"), reason: "absorbed_mid_turn" }));
+  t.feed(op("remove", { content: notice("b9t", "<status>completed</status>"), reason: "absorbed_mid_turn" }));
+  t.feed(op("enqueue", { content: "and then this" }));
+  const snap = t.snapshot(10);
+  expect(snap.items[0]).toMatchObject({ kind: "agent", from: "implementador", text: "Task 1 done.\n\n- tests pass", handback: true });
+  expect(snap.items.some((i) => i.kind === "user")).toBe(false);
+  expect(snap.queued).toEqual(["and then this"]);
+  // the person's message leaves with the next dequeue, not a notice waiting ahead of it
+  t.feed(op("enqueue", { content: notice("c1", "<status>completed</status>") }));
+  t.feed(op("dequeue"));
+  expect(t.snapshot(10).queued).toEqual([]);
+});
+
 test("an edit's real patch replaces the diff guessed from its input", () => {
   const t = feed([
     assistant([{ type: "tool_use", id: "w", name: "Write", input: { file_path: "/Users/ana/p/a.ts", content: "a\nB\nc\nd" } }]),

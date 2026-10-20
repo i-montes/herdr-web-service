@@ -154,6 +154,8 @@ export type PlanStatus = "pending" | "in_progress" | "completed";
 export type ChatItem =
   | { kind: "user"; id: string; text: string; at: string | null }
   | { kind: "assistant"; id: string; text: string; at: string | null }
+  /** a message from another agent of the session; `handback`: a subagent's final report */
+  | { kind: "agent"; id: string; from: string; text: string; handback: boolean; at: string | null }
   | { kind: "tool"; id: string; name: string; summary: string; detail: ToolDetail | null; state: "running" | "done" | "error"; output: string | null }
   | { kind: "plan"; id: string; items: { text: string; status: PlanStatus }[] }
   | { kind: "question"; id: string; questions: { question: string; options: { label: string; description: string }[] }[]; answer: string | null }
