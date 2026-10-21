@@ -64,7 +64,11 @@ Para desarrollo, enlázalo desde la carpeta del repo: `herdr plugin link "$PWD"`
     acaba con su `<task-notification>` con `<status>` o un `TaskStop`; la web lo muestra en la
     pestaña "N running" sobre el input (`RunningTasks.tsx`). `prompt.ts` lee de la
     pantalla el menú que espera el agente (permisos, preguntas, /model, el deslizador de /effort)
-    y lo responde con flechas + Enter. El diálogo de permisos de OpenCode (`△ Permission required`,
+    y lo responde con flechas + Enter. AskUserQuestion se reconoce por la pantalla (el transcript
+    solo guarda la llamada cuando ya tiene respuesta), con las descripciones bajo cada opción: varias
+    preguntas son pestañas (`← ☒ Color ☐ Size ✔ Submit →`; la actual solo se ve por su fondo, así
+    que se relee con `format: "ansi"`, y `{step}` en `…/choose` se mueve con ←/→) y una revisión
+    final; en selección múltiple Enter marca `[✔]` y la fila sin número "Next"/"Submit" avanza. El diálogo de permisos de OpenCode (`△ Permission required`,
     `Allow once   Allow always   Reject`) solo marca la opción elegida con el color de fondo: si el
     texto plano no da menú y hay `⇆ select`/`enter confirm`, se relee con `format: "ansi"`
     (`parseOpencodePrompt`, solo en paneles de OpenCode y con el encabezado `△` encima: el texto

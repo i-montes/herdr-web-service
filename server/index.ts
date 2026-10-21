@@ -25,7 +25,7 @@ import { paneIdFrom, parsePaneInput } from "./herdr/panes.ts";
 import { listDirs } from "./fsbrowse.ts";
 import { MAX_UPLOAD, cleanupUploads, saveUpload, uploadPath } from "./uploads.ts";
 import { locateTranscript, readChat } from "./chat/store.ts";
-import { keysToChoose, mayShowOpencodeDialog, parseOpencodePrompt, parsePrompt } from "./chat/prompt.ts";
+import { keysToChoose, keysToStep, mayShowOpencodeDialog, parseOpencodePrompt, parsePrompt, questionStep } from "./chat/prompt.ts";
 import { locateOpencodeSession, opencodeDb, readOpencodeChat } from "./chat/opencode.ts";
 import { readClaudeStatus } from "./chat/usage.ts";
 import { opencodeCatalog, opencodeUsage, opencodeVariants, parseOpencodeFooter, recentOpencodeModels, setOpencodeModel, setOpencodeVariant } from "./chat/opencode-controls.ts";
@@ -337,6 +337,12 @@ async function opencodeOptions(paneId: string): Promise<{ models: ReturnType<typ
 async function currentPrompt(paneId: string): Promise<PanePrompt | null> {
   const screen = await herdr.request<{ read: { text: string } }>("pane.read", { pane_id: paneId, source: "visible", strip_ansi: true });
   const prompt = parsePrompt(screen.read.text);
+  if (prompt?.steps && prompt.step === undefined) {
+    // several questions in one: only the colors tell which tab is on screen
+    const colored = await herdr.request<{ read: { text: string } }>("pane.read", { pane_id: paneId, source: "visible", format: "ansi" });
+    const step = questionStep(colored.read.text);
+    return step === null ? prompt : { ...prompt, step };
+  }
   if (prompt || !mayShowOpencodeDialog(screen.read.text)) return prompt;
   // OpenCode marks its choice by color only: read the screen again with its colors. Only in an
   // OpenCode pane: another agent's screen can show those words (a command, a file) as plain text
@@ -445,12 +451,13 @@ async function herdrRoute(request: Request, pathname: string, method: string): P
   }
   const chooseIn = paneIdFrom(pathname, "choose");
   if (chooseIn && method === "POST") {
-    const body = (await readJson(request)) as { index?: unknown } | undefined;
-    // read the menu again now: the answer is relative to what the terminal shows this moment
+    const body = (await readJson(request)) as { index?: unknown; step?: unknown } | undefined;
+    // read the menu again now: the answer is relative to what the terminal shows this moment.
+    // `step` moves to another of several questions instead of answering
     const prompt = await currentPrompt(chooseIn);
-    const keys = prompt && keysToChoose(prompt, Number(body?.index));
+    const keys = prompt && (body?.step !== undefined ? keysToStep(prompt, Number(body.step)) : keysToChoose(prompt, Number(body?.index)));
     if (!keys) return apiError("no_prompt", "nothing to choose right now", 409);
-    await herdr.request("pane.send_keys", { pane_id: chooseIn, keys });
+    if (keys.length) await herdr.request("pane.send_keys", { pane_id: chooseIn, keys });
     return new Response(null, { status: 204 });
   }
   // OpenCode's model and variant (its effort), driven through its own dialog and ctrl+t

@@ -247,6 +247,17 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
     }
   };
 
+  const goTo = async (target: number) => {
+    setError(null);
+    try {
+      await api.step(paneId, target);
+      pollNow.current(true);
+    } catch {
+      setError("The question has changed; check the terminal.");
+      pollNow.current();
+    }
+  };
+
   const items = chat?.items ?? [];
   const pendingQuestion = [...items].reverse().find((i): i is QuestionItem => i.kind === "question" && i.answer === null) ?? null;
   const choosing = !!prompt && !freeText;
@@ -270,7 +281,13 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
     const count = prompt.options.length;
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      const number = /^[1-9]$/.test(e.key) ? indexOfNumber(prompt, Number(e.key)) : -1;
+      // several questions in one: ← → go between them, as in the terminal
+      if (prompt.steps && prompt.step !== undefined && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        const target = prompt.step + (e.key === "ArrowRight" ? 1 : -1);
+        if (target >= 0 && target <= prompt.steps.length) void goTo(target);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowRight") {
         e.preventDefault();
         setHighlight((h) => (h + 1) % count);
       } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
@@ -279,9 +296,9 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
       } else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement)) {
         e.preventDefault();
         pick(highlight);
-      } else if (/^[1-9]$/.test(e.key) && Number(e.key) <= count) {
+      } else if (number >= 0) {
         e.preventDefault();
-        pick(Number(e.key) - 1);
+        pick(number);
       } else if (e.key === "Escape") {
         e.preventDefault();
         void cancel();
@@ -342,8 +359,8 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
           ))}
 
           {prompt &&
-            (pendingQuestion ? (
-              <QuestionPrompt prompt={prompt} question={pendingQuestion} highlight={choosing ? highlight : -1} onPick={pick} onHover={setHighlight} onCancel={cancel} />
+            (pendingQuestion || prompt.question ? (
+              <QuestionPrompt prompt={prompt} question={pendingQuestion} highlight={choosing ? highlight : -1} onPick={pick} onHover={setHighlight} onCancel={cancel} onStep={goTo} />
             ) : (
               <ChoicePrompt prompt={prompt} highlight={choosing ? highlight : -1} onPick={pick} onHover={setHighlight} onCancel={cancel} />
             ))}
@@ -363,7 +380,7 @@ export function ChatView({ pane, onModel, onUsage, onMenu, onGone }: {
 
       {choosing && prompt && (
         <div className="sticky bottom-0 z-10 hidden justify-center border-t border-line bg-surface px-4 py-3 text-[13px] text-muted lg:flex">
-          ↑ ↓ to move · 1–{Math.min(prompt.options.length, 9)} to pick · Enter confirms · Esc cancels
+          ↑ ↓ to move{prompt.steps ? " · ← → between questions" : ""} · 1–{Math.min(numberOf(prompt, prompt.options.length - 1) ?? prompt.options.length, 9)} to pick · Enter {prompt.checked ? "ticks" : "confirms"} · Esc cancels
         </div>
       )}
       <div className={`sticky bottom-0 z-10 justify-center border-t border-line bg-surface px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] ${choosing ? "hidden" : "flex"}`}>
@@ -650,32 +667,110 @@ interface MenuProps {
   onCancel: () => void;
 }
 
-/** a question the agent asked (AskUserQuestion / question tool), answerable from here */
-function QuestionPrompt({ prompt, question, highlight, onPick, onHover, onCancel }: MenuProps & { question: QuestionItem }) {
-  const descriptions = new Map(question.questions.flatMap((q) => q.options.map((o) => [o.label, o.description] as const)));
-  const title = question.questions.find((q) => prompt.title.includes(q.question.slice(0, 20)))?.question ?? prompt.title;
+/** the number the terminal shows for an option: none for a multiple choice's "Next" row, which takes no number */
+function numberOf(prompt: PanePrompt, index: number): number | null {
+  if (prompt.next === undefined || index < prompt.next) return index + 1;
+  return index === prompt.next ? null : index;
+}
+
+/** the option the terminal numbers `n`, -1 when none does */
+function indexOfNumber(prompt: PanePrompt, n: number): number {
+  return prompt.options.findIndex((_, i) => numberOf(prompt, i) === n);
+}
+
+/**
+ * A question the agent asked (AskUserQuestion / question tool), answerable from here. Several
+ * questions in one come as tabs to move between, then a review; a multiple choice ticks its
+ * options one by one and moves on with "Next".
+ */
+function QuestionPrompt({ prompt, question, highlight, onPick, onHover, onCancel, onStep }: MenuProps & { question: QuestionItem | null; onStep: (step: number) => void }) {
+  // the screen shows each description under its option; the transcript has the call only once answered
+  const asked = question?.questions ?? [];
+  const known = new Map(asked.flatMap((q) => q.options.map((o) => [o.label, o.description] as const)));
+  const describe = (i: number) => prompt.descriptions?.[i] || known.get(prompt.options[i] ?? "") || "";
+  const reviewing = !!prompt.review;
+  const title = asked.find((q) => prompt.title.includes(q.question.slice(0, 20)))?.question ?? prompt.title;
   return (
     <div role="listbox" aria-label={title} className="flex flex-col gap-3.5 rounded-[18px] bg-accent p-5 text-white">
-      <div className="font-mono text-[11px] tracking-[0.12em] text-question-soft uppercase">Question</div>
+      {prompt.steps && prompt.steps.length > 0 ? (
+        <div role="tablist" aria-label="Questions" className="flex flex-wrap gap-1.5">
+          {[...prompt.steps, { label: "Review", answered: false }].map((s, i) => {
+            const on = i === prompt.step;
+            return (
+              <button
+                key={i}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                disabled={prompt.step === undefined}
+                onClick={() => !on && onStep(i)}
+                className={`flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[11px] tracking-[0.06em] uppercase disabled:cursor-default ${on ? "bg-white text-[#16161a]" : "border border-question-line text-question-soft hover:bg-question-alt"}`}
+              >
+                {s.answered && <span aria-label="answered">✓</span>}
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="font-mono text-[11px] tracking-[0.12em] text-question-soft uppercase">Question</div>
+      )}
       <div className="text-xl leading-tight font-bold tracking-[-0.01em]">{title}</div>
+      {prompt.checked && <div className="-mt-2 text-[13px] text-question-soft">Pick all that apply{prompt.next !== undefined ? `, then ${prompt.options[prompt.next]}` : ""}.</div>}
+      {reviewing && (
+        <div className="flex flex-col gap-2 rounded-xl border border-question-line bg-question-alt px-3.5 py-3">
+          {prompt.review!.length === 0 && <span className="text-sm text-question-soft">No answers yet.</span>}
+          {prompt.review!.map((r, i) => (
+            <div key={i} className="flex flex-col gap-px">
+              <span className="text-[13px] text-question-soft">{r.question}</span>
+              <span className="text-[15px] font-semibold">{r.answer}</span>
+            </div>
+          ))}
+          {prompt.steps && prompt.review!.length < prompt.steps.length && <span className="text-[13px] text-question-soft">Not every question has an answer.</span>}
+        </div>
+      )}
       <div className="flex flex-col gap-2">
         {prompt.options.map((label, i) => {
           const free = FREE_OPTION.test(label);
           const on = i === highlight;
+          const ring = on ? "ring-2 ring-white ring-offset-2 ring-offset-accent" : "";
+          if (i === prompt.next) {
+            return (
+              <button
+                key={i}
+                type="button"
+                role="option"
+                aria-selected={on}
+                onClick={() => onPick(i)}
+                onMouseEnter={() => onHover(i)}
+                className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 self-start rounded-xl bg-white px-5 py-2.5 text-[15px] font-semibold text-[#16161a] ${ring}`}
+              >
+                {label}
+                <Icon d="M5 12h14M13 6l6 6-6 6" size={16} width={2.4} />
+              </button>
+            );
+          }
+          const box = prompt.checked?.[i] ?? null;
+          const number = numberOf(prompt, i);
           return (
             <button
               key={i}
               type="button"
               role="option"
               aria-selected={on}
+              aria-checked={box ?? undefined}
               onClick={() => onPick(i)}
               onMouseEnter={() => onHover(i)}
-              className={`flex cursor-pointer items-center gap-3 rounded-xl px-3.5 py-3 text-left ${free ? "border border-dashed border-question-line" : on ? "bg-white text-[#16161a]" : "border border-question-line bg-question-alt"} ${on ? "ring-2 ring-white ring-offset-2 ring-offset-accent" : ""}`}
+              className={`flex cursor-pointer items-center gap-3 rounded-xl px-3.5 py-3 text-left ${free ? "border border-dashed border-question-line" : on ? "bg-white text-[#16161a]" : "border border-question-line bg-question-alt"} ${ring}`}
             >
-              <span className={`flex size-[26px] shrink-0 items-center justify-center rounded-[7px] font-mono text-xs ${on && !free ? "bg-[#16161a] text-white" : "bg-question-tile text-white"}`}>{i + 1}</span>
+              {box !== null ? (
+                <span className={`flex size-[26px] shrink-0 items-center justify-center rounded-[7px] text-sm font-bold ${!box ? "border-2 border-question-line" : on ? "bg-[#16161a] text-white" : "bg-white text-[#16161a]"}`}>{box ? "✓" : ""}</span>
+              ) : (
+                <span className={`flex size-[26px] shrink-0 items-center justify-center rounded-[7px] font-mono text-xs ${on && !free ? "bg-[#16161a] text-white" : "bg-question-tile text-white"}`}>{number}</span>
+              )}
               <span className="flex flex-col gap-px">
                 <span className="text-[15px] font-semibold">{free ? "Type another answer…" : label}</span>
-                {descriptions.get(label) && <span className={`text-[13px] ${on && !free ? "text-[#66645c]" : "text-question-soft"}`}>{descriptions.get(label)}</span>}
+                {describe(i) && <span className={`text-[13px] ${on && !free ? "text-[#66645c]" : "text-question-soft"}`}>{describe(i)}</span>}
               </span>
             </button>
           );
@@ -702,7 +797,8 @@ function ChoicePrompt({ prompt, highlight, onPick, onHover, onCancel }: MenuProp
           const isCurrent = prompt.current === i;
           const on = i === highlight;
           const ring = on ? "ring-2 ring-accent-ink ring-offset-2 ring-offset-ask" : "";
-          const number = i < 9 && <span className="font-mono text-xs text-muted">{i + 1}</span>;
+          const shown = numberOf(prompt, i);
+          const number = shown !== null && shown <= 9 && <span className="font-mono text-xs text-muted">{shown}</span>;
           if (list) {
             return (
               <button

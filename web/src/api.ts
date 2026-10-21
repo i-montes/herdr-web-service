@@ -62,6 +62,8 @@ export const api = {
   chat: (id: string, version: string | null) => call<ChatResponse>(pane(id, "chat") + (version ? `?v=${encodeURIComponent(version)}` : "")),
   prompt: (id: string, text: string) => call<void>(pane(id, "prompt"), post({ text })),
   choose: (id: string, index: number) => call<void>(pane(id, "choose"), post({ index })),
+  /** another of several questions in one (Claude Code's tabs), the review last */
+  step: (id: string, step: number) => call<void>(pane(id, "choose"), post({ step })),
   opencodeOptions: (id: string) => call<OpencodeOptions>(pane(id, "models")),
   opencodeModel: (id: string, provider: string, model: string) => call<void>(pane(id, "model"), post({ provider, model })),
   opencodeVariant: (id: string, variant: string | null) => call<void>(pane(id, "variant"), post({ variant })),

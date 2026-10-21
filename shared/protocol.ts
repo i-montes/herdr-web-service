@@ -230,6 +230,23 @@ export interface PanePrompt {
   current?: number;
   /** how the cursor moves between options */
   axis: "vertical" | "horizontal";
+  /**
+   * the agent's question tool (Claude Code's AskUserQuestion), told by its screen: the transcript
+   * only records the call once it has its answer
+   */
+  question?: boolean;
+  /** the line under each option that explains it, when the menu shows one */
+  descriptions?: (string | null)[];
+  /** a multiple choice: whether each option is ticked; null for the rows that are not choices */
+  checked?: (boolean | null)[];
+  /** the row that confirms a multiple choice and moves on (Claude Code's unnumbered "Next") */
+  next?: number;
+  /** several questions in one (Claude Code's tabs): each one's header and whether it has an answer */
+  steps?: { label: string; answered: boolean }[];
+  /** the question on screen, an index into `steps`; `steps.length` is the review before submitting */
+  step?: number;
+  /** the review before submitting: each answered question and its answer */
+  review?: { question: string; answer: string }[];
 }
 
 export interface ChatResponse {

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ansiCells, mayShowOpencodeDialog, parseOpencodePrompt, keysToChoose, parsePrompt } from "./prompt.ts";
+import { ansiCells, mayShowOpencodeDialog, parseOpencodePrompt, keysToChoose, keysToStep, parsePrompt, questionStep } from "./prompt.ts";
 
 const trust = `
 ❯ claude
@@ -72,8 +72,10 @@ test("question: descriptions are not options, the cursor can be anywhere", () =>
   expect(parsePrompt(question)).toEqual({
     title: "Apply the 2 migrations before running the tests?",
     options: ["Yes, on the local database", "No, just the tests", "Type something."],
+    descriptions: ["Recommended · does not touch staging", "Some will fail because of the schema", null],
     selected: 1,
     axis: "vertical",
+    question: true,
   });
 });
 
@@ -238,4 +240,91 @@ test("OpenCode's question: numbered options with their descriptions, the chosen 
 test("ansi cells: text and backgrounds, 256 colors and resets included", () => {
   expect(ansiCells("a\x1b[48;5;21mbc\x1b[0md\x1b]0;title\x07e\r")).toEqual({ text: "abcde", bg: [null, "#21", "#21", null, null] });
   expect(ansiCells("\x1b[44mx\x1b[49my").bg).toEqual(["#44", null]);
+});
+
+// several questions in one, as Claude Code 2.1 draws them: tabs, checkboxes, "Next", a review
+const RULE = "────────────────────────────────────────────────────────────";
+const toppings = (cursor: "olives" | "next") => `
+${RULE}
+←  ☒ Color  ☒ Toppings  ☐ Size  ✔ Submit  →
+
+Which toppings do you want?
+
+  1. [✔] Cheese
+         classic
+${cursor === "olives" ? "❯" : " "} 2. [ ] Olives
+         salty
+  3. [✔] Basil
+         fresh
+  4. [ ] Type something
+${cursor === "next" ? "❯" : " "}    Next
+${RULE}
+  5. Chat about this
+
+Enter to select · Tab/Arrow keys to navigate · Esc to cancel
+`;
+
+test("a multiple choice: its ticks, and Next as a choice without a number", () => {
+  const prompt = parsePrompt(toppings("olives"))!;
+  expect(prompt).toMatchObject({
+    title: "Which toppings do you want?",
+    options: ["Cheese", "Olives", "Basil", "Type something", "Next", "Chat about this"],
+    checked: [true, false, true, false, null, null],
+    next: 4,
+    selected: 1,
+    steps: [
+      { label: "Color", answered: true },
+      { label: "Toppings", answered: true },
+      { label: "Size", answered: false },
+    ],
+  });
+  // the ✔ of a ticked box is not the current setting
+  expect(prompt.current).toBeUndefined();
+  // "Chat about this" sits below Next: one more step down than its number says
+  expect(keysToChoose(prompt, 5)).toEqual(["down", "down", "down", "down", "enter"]);
+  // the cursor on Next still reads the whole menu
+  expect(parsePrompt(toppings("next"))).toMatchObject({ selected: 4, next: 4, options: prompt.options });
+});
+
+test("the review before submitting, the last of the tabs", () => {
+  const review = `
+${RULE}
+←  ☒ Pet  ☐ Fruit  ✔ Submit  →
+
+Review your answers
+
+⚠ You have not answered all questions
+
+ ● Cat or dog?
+   → Cat
+
+Ready to submit your answers?
+
+❯ 1. Submit answers
+  2. Cancel
+`;
+  const prompt = parsePrompt(review)!;
+  expect(prompt).toMatchObject({
+    title: "Ready to submit your answers?",
+    options: ["Submit answers", "Cancel"],
+    review: [{ question: "Cat or dog?", answer: "Cat" }],
+    step: 2,
+  });
+  expect(keysToStep(prompt, 0)).toEqual(["left", "left"]);
+  expect(keysToStep(prompt, 2)).toEqual([]);
+  expect(keysToStep(prompt, 3)).toBeNull();
+});
+
+test("the question on screen is the tab on its own background", () => {
+  const row = (colored: number) => {
+    const tabs = [" ☒ Pet ", " ☐ Fruit ", " ✔ Submit "];
+    return "\x1b[38;2;153;153;153m← \x1b[0m" + tabs.map((t, i) => (i === colored ? `\x1b[38;2;0;0;0m\x1b[48;2;177;185;249m${t}\x1b[0m` : t)).join(" ") + " →";
+  };
+  expect(questionStep(`\n${row(0)}\n\nCat or dog?\n`)).toBe(0);
+  expect(questionStep(`\n${row(1)}\n`)).toBe(1);
+  expect(questionStep(`\n${row(2)}\n`)).toBe(2);
+  expect(questionStep("no tabs here")).toBeNull();
+  const prompt = { ...parsePrompt(toppings("olives"))!, step: 1 };
+  expect(keysToStep(prompt, 3)).toEqual(["right", "right"]);
+  expect(keysToStep(prompt, 0)).toEqual(["left"]);
 });
